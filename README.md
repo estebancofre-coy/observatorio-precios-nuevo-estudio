@@ -1,0 +1,17 @@
+
+Markdown View 
+AA
+Copia para un nuevo estudio
+Esta copia local comenzó sin historial Git, padrón, respuestas ni cuentas de aplicadores. Es independiente del estudio anterior: no incluye sus datos locales ni sus planillas. La cuenta inicial prevista es Esteban Cofré; su contraseña anterior no se copió.
+Se copiaron los archivos de captura, gestión y recursos gráficos; se omitieron informes, presentaciones, documentos y catálogos del estudio anterior. El repositorio público contiene únicamente los archivos necesarios para el sitio estático; los archivos Apps Script permanecen locales y se copian manualmente a sus proyectos.
+Abre acceso.html para acceder a la captura local y al portal nuevo preconfigurado. Puedes reemplazar o quitar su enlace en ese navegador; esta modificación no cambia los enlaces de index.html.
+Preparación
+Crea dos planillas de Google vacías y dos proyectos Apps Script nuevos e independientes. No copies ni reutilices proyectos, propiedades, implementaciones ni planillas del estudio anterior.
+En apps-script\Code.gs, configura DATABASE_SPREADSHEET_ID con el ID de la planilla nueva de captura. Copia Code.gs y SampleLocals.gs al nuevo proyecto y ejecuta setupDatabase. Configura allí la propiedad ESPORA_RESUME_ACCESS_CODE con una clave elegida para el nuevo equipo y publica una implementación nueva.
+En app.js, configura API_URL con la URL /exec nueva de captura. El sitio se publica en GitHub Pages: https://estebancofre-coy.github.io/observatorio-precios-nuevo-estudio/.
+En apps-script-management\Code.gs, configura MANAGEMENT_SPREADSHEET_ID con la planilla nueva de gestión, CAPTURE_SPREADSHEET_ID con la planilla nueva de captura y CAPTURE_APP_URL con la URL del sitio nuevo. Copia Code.gs, Admin.html, Collector.html, Client.html y Styles.html al proyecto nuevo de gestión. Ejecuta setupManagementPortal.
+En las propiedades del proyecto de gestión, define ESPORA_INITIAL_PASSWORD_ESTEBAN con una clave temporal elegida de forma segura. Ejecuta setupIndividualPortalAccess, autoriza los permisos solicitados y publica una implementación nueva. La propiedad temporal se consume y Esteban deberá establecer una clave personal en su primer ingreso.
+Comprueba que los enlaces preconfigurados en index.html y acceso.html abran el portal nuevo. Desde administración crea los aplicadores por nombre y correo. Reciben una clave temporal por correo y deben cambiarla al primer ingreso. Comprueba los permisos y la cuota de envío de correo de Apps Script.
+La pestaña Asignacion 107 de la planilla de gestión se crea vacía, con encabezados. Se puede completar con locales del nuevo estudio. La captura permite registrar locales nuevos; incorporar esos locales al padrón de gestión requiere agregarlos a dicha pestaña.
+Solo se aceptan respuestas de Disponibilidad y Precios. Las estructuras históricas de clasificación y origen permanecen en el código por compatibilidad, pero sus formularios no están habilitados y el servidor rechaza su guardado. Para el nuevo estudio revisa la canasta, los ítems, el nombre, las instituciones y el texto territorial antes de publicar; son los heredados del proyecto original, no datos de visitas.
+No ejecutar estos pasos sobre los recursos del estudio anterior. El correo con clave temporal debe tratarse como información sensible.
