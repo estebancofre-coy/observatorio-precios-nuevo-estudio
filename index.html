@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f5a48">
+  <meta name="description" content="ESPORA Coyhaique: Economia Social, Precios, Organicos, Residuos y Alimentacion.">
+  <meta property="og:title" content="ESPORA Coyhaique">
+  <meta property="og:description" content="Economia Social, Precios, Organicos, Residuos y Alimentacion: un observatorio territorial que germina desde el compostaje y la Economia Social y Solidaria.">
+  <title>ESPORA Coyhaique | Levantamiento</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <header class="brand">
+      <div class="partner-logos" role="group" aria-label="Instituciones vinculadas a ESPORA">
+        <img class="partner-logo logo-uaysen" src="assets/logo-uaysen.png" alt="Departamento de Ciencias Sociales y Humanidades, Universidad de Aysén" width="1000" height="378">
+        <img class="partner-logo logo-fao" src="assets/logo-fao.png" alt="Organización de las Naciones Unidas para la Alimentación y la Agricultura (FAO)" width="763" height="229">
+      </div>
+      <div class="brand-title"><img class="brand-spore" src="assets/espora-arbol-bosque.png" alt="" width="56" height="45"><div><h1>ESPORA Coyhaique</h1><p class="brand-strip">Economía Social · Precios · Orgánicos · Residuos · Alimentación</p></div></div>
+      <nav class="brand-actions" aria-label="Accesos de ESPORA">
+        <details class="access-menu">
+          <summary>ACCEDER <span aria-hidden="true">⌄</span></summary>
+          <div class="access-menu-options">
+            <a href="https://script.google.com/macros/s/AKfycbxiiF_WdOZK-zOe977GjqJU6q4nBHvfjGSdJ3SQqrysSewZKxijs7GcI6RCrrluiSg29A/exec" target="_blank" rel="noopener noreferrer">Administración <span aria-hidden="true">↗</span></a>
+            <a href="https://script.google.com/macros/s/AKfycbxiiF_WdOZK-zOe977GjqJU6q4nBHvfjGSdJ3SQqrysSewZKxijs7GcI6RCrrluiSg29A/exec?view=collector" target="_blank" rel="noopener noreferrer">Portal de aplicadores <span aria-hidden="true">↗</span></a>
+          </div>
+        </details>
+      </nav>
+    </header>
+    <div id="connection" class="online"></div>
+    <div id="message" role="alert"></div>
+
+    <section id="visitView" class="view">
+      <section class="hero" aria-labelledby="heroTitle">
+        <div class="hero-content">
+          <p class="eyebrow">OBSERVATORIO TERRITORIAL DE ECONOMÍA SOCIAL Y ALIMENTACIÓN</p>
+          <h2 id="heroTitle">ESPORA</h2>
+          <p class="hero-summary">Una herramienta de terreno para observar los comercios, alimentos y economías que dan forma a Coyhaique.</p>
+          <div class="hero-actions">
+            <a class="hero-action primary" href="#resumeVisitPanel">Retomar una visita pendiente <span aria-hidden="true">↓</span></a>
+            <a class="hero-action secondary" href="#visitForm">Iniciar una visita nueva</a>
+          </div>
+          <div class="hero-tags" aria-label="Instituciones y marco de referencia">
+            <span>Universidad de Aysén</span>
+            <span>Financia: FAO Chile</span>
+            <span>Economía Social y Solidaria</span>
+            <span>Coyhaique, Aysén</span>
+          </div>
+        </div>
+        <div class="hero-landscape" aria-hidden="true">
+          <img class="paper paper-tree-back" src="assets/espora-arbol-salvia.png" alt="">
+          <img class="paper paper-tree-front" src="assets/espora-arbol-bosque.png" alt="">
+          <img class="paper paper-huemul" src="assets/espora-huemul.png" alt="">
+          <img class="paper paper-leaves" src="assets/espora-hojas.png" alt="">
+        </div>
+      </section>
+      <section id="resumeVisitPanel" class="resume-visit-panel" aria-labelledby="resumeVisitTitle">
+        <div class="resume-intro">
+          <span class="resume-mark" aria-hidden="true">↗</span>
+          <div>
+            <p class="eyebrow">¿YA HAY UNA VISITA EN CURSO?</p>
+            <h2 id="resumeVisitTitle">Retome el trabajo donde quedó</h2>
+            <p>Busque la visita por código de local y continúe con Disponibilidad o Precios.</p>
+          </div>
+        </div>
+        <form id="resumeVisitForm" class="resume-visit-search">
+          <label class="required" for="resumeLocalCode">Código del local<input id="resumeLocalCode" autocomplete="off" placeholder="Código del local" required></label>
+          <label class="required" for="resumeAccessCode">Clave compartida del equipo<input id="resumeAccessCode" type="password" autocomplete="off" required></label>
+          <button id="resumeVisitButton" type="submit">Buscar visita</button>
+        </form>
+        <p class="resume-connection-note">Necesita conexión a internet para buscar y cargar la visita en este dispositivo.</p>
+        <div id="resumeVisitResults" class="resume-visit-results" aria-live="polite"></div>
+      </section>
+
+
+      <div class="card visit-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">NUEVA VISITA</p>
+            <h2>Identifica el establecimiento</h2>
+          </div>
+          <span class="step">Primero, identifica el local</span>
+        </div>
+        <p>Esta ficha abre una visita y comparte la identificación con sus pautas. Cada instrumento se completa y guarda por separado.</p>
+        <form id="visitForm">
+          <div class="grid">
+            <label class="required">Fecha de observación<input id="observationDate" type="date" required></label>
+            <label class="required">Persona que identifica el local<input id="collector" autocomplete="name" placeholder="Nombre y apellidos" required>
+              <span class="field-help" id="collectorCodeHint">Escriba nombre y apellidos. Sus iniciales se agregan solas al código de los locales nuevos.</span>
+            </label>
+            <div id="sampleLocalFields" class="wide">
+              <div class="field-stack local-search-stack">
+                <label for="localSearch">Buscar local en la muestra</label>
+                <div class="local-search-input-wrap">
+                  <input id="localSearch" type="search" placeholder="Escriba nombre, calle o código (ej. Prat, Ogana, LM-01)…" autocomplete="off">
+                  <button id="clearLocalSearch" class="secondary local-search-clear" type="button" aria-label="Limpiar búsqueda" title="Limpiar búsqueda" hidden>&times;</button>
+                </div>
+                <div class="local-search-meta">
+                  <span id="localSearchCount" class="field-help">0 locales disponibles en la muestra.</span>
+                </div>
+              </div>
+              <label class="required wide" for="localCode">Local de la muestra
+                <select id="localCode" required>
+                  <option value="">Seleccione un local…</option>
+                </select>
+              </label>
+              <p class="field-help">La lista muestra código, nombre y dirección para identificar el local sin memorizar el número.</p>
+            </div>
+            <div class="wide new-local-choice">
+              <label class="checkbox-field"><input id="isNewLocal" type="checkbox"> No aparece en la lista: registrar un local nuevo</label>
+              <p class="field-help">Revise la lista por código, nombre y dirección. Active esta opción solo si el local no está registrado.</p>
+            </div>
+            <div id="newLocalFields" class="wide" hidden>
+              <div class="grid new-local-grid">
+                <div class="code-field wide">
+                  <label>Código asignado<input id="newLocalCode" readonly></label>
+                  <button class="secondary" id="regenerateCodeButton" type="button">Generar otro código</button>
+                </div>
+                <label class="required">Nombre del nuevo local<input id="newLocalName" placeholder="Ejemplo: Almacén del barrio"></label>
+                <div class="field-stack">
+                  <label class="required">Dirección o referencia<input id="newLocalAddress" placeholder="Calle, número o referencia"></label>
+                  <span class="field-help">Ingrese una dirección o referencia que permita reconocer el local en el mapa.</span>
+                </div>
+                <label class="required">Tipo de local<select id="newLocalType"><option value="">Seleccione</option><option value="Almacén o minimarket">Almacén o minimarket</option><option>Supermercado</option><option>Venta de Frutas y Verduras</option><option>Mercado Campesino</option><option>Productor Hortícola</option><option>Otro</option></select></label>
+              </div>
+              <p class="field-help">Use «Generar otro código» solo si el sistema avisa que el código ya está ocupado.</p>
+            </div>
+            <div class="wide location-capture">
+              <div class="grid">
+                <label class="required">Latitud GPS<input id="latitude" type="number" step="any" min="-90" max="90" placeholder="-45.575" required></label>
+                <label class="required">Longitud GPS<input id="longitude" type="number" step="any" min="-180" max="180" placeholder="-72.067" required></label>
+                <div class="location-action"><span class="field-label">GPS del dispositivo</span><button class="secondary" id="locationButton" type="button">Usar ubicación actual</button></div>
+                <div class="visit-frontis">
+                  <label>Foto del frontis (opcional)<input id="visitFrontis" type="file" accept="image/*" aria-describedby="visitFrontisHelp visitFrontisStatus"></label>
+                  <p id="visitFrontisHelp" class="field-help">La foto se guarda por separado. No es necesaria para continuar ni guardar las pautas.</p>
+                  <button id="saveVisitFrontis" class="secondary" type="button">Guardar foto del frontis</button>
+                  <p id="visitFrontisStatus" class="field-help" role="status" aria-live="polite"></p>
+                  <a id="visitFrontisLink" target="_blank" rel="noopener" hidden>Ver foto guardada ↗</a>
+                </div>
+                <label>Autorización para fotografía interior
+                  <select id="interiorPhotoAuthorization" required>
+                    <option value="No consultada">No consultada</option>
+                    <option value="Autorizada">Autorizada</option>
+                    <option value="No autorizada">No autorizada</option>
+                  </select>
+                  <span class="field-help">Registre la respuesta aunque no se tome una fotografía. Esta versión no carga fotos interiores.</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="actions"><button type="submit">Continuar a las pautas</button></div>
+        </form>
+      </div>
+    </section>
+
+    <section id="menuView" class="view" hidden>
+      <div class="card">
+        <h2>Visita activa</h2>
+        <p id="visitSummary"></p>
+        <p id="resumedVisitNotice" class="resume-visit-notice" hidden>Esta visita se retomó desde Sheets. Su copia local permitirá continuar si pierde conexión.</p>
+        <h3 class="instrument-section-title" hidden>Pauta de clasificación</h3>
+        <div class="actions" hidden>
+          <button class="instrument special-instrument" data-instrument="classification" type="button">1. Clasificación del establecimiento (solo almacenes y minimarkets)<span id="classificationStatus"></span></button>
+        </div>
+        <p class="field-help classification-scope-notice" hidden><strong>Aplica únicamente a almacenes y minimarkets:</strong> Esta pauta determina si el local opera como almacén de barrio o minimarket. En carnicerías, pescaderías, verdulerías y supermercados <em>no se aplica</em>.</p>
+        <h3 class="instrument-section-title">Pautas de observación, en este orden</h3>
+        <div class="actions">
+          <button class="instrument" data-instrument="availability" type="button">Disponibilidad y variedad<span id="availabilityStatus"></span></button>
+          <button class="instrument" data-instrument="origins" type="button" hidden>Registro de origen<span id="originsStatus"></span></button>
+          <button class="instrument" data-instrument="prices" type="button">Registro de precios<span id="pricesStatus"></span></button>
+        </div>
+        <p class="field-help">Cada pauta registra a su propia persona responsable.</p>
+        <p id="visitSaveStatus" class="visit-save-status" role="status" aria-live="polite"></p>
+
+        <section class="visit-photos-card" id="menuPhotosSection" aria-labelledby="menuPhotosTitle">
+          <div class="visit-photos-header">
+            <div>
+              <p class="eyebrow">REGISTRO FOTOGRÁFICO</p>
+              <h3 id="menuPhotosTitle" class="visit-photos-title">Fotografías del establecimiento</h3>
+            </div>
+            <a id="localDriveFolderLink" class="folder-drive-link" target="_blank" rel="noopener" hidden>📁 Ver carpeta en Drive ↗</a>
+          </div>
+          <p class="field-help">Las imágenes se guardan automáticamente en una carpeta propia de este local en Google Drive (incluyendo la foto de fachada).</p>
+
+          <div class="photos-capture-grid">
+            <div class="photo-capture-box">
+              <label for="menuVisitFrontis"><strong>Foto del frontis (fachada exterior)</strong>
+                <span class="field-help">Foto del frontis para identificar la fachada y acceso del local.</span>
+              </label>
+              <input id="menuVisitFrontis" type="file" accept="image/*" aria-describedby="menuVisitFrontisStatus">
+              <div class="photo-box-actions">
+                <button id="saveMenuVisitFrontis" class="secondary" type="button">Guardar foto frontis</button>
+                <a id="menuVisitFrontisLink" class="photo-view-link" target="_blank" rel="noopener" hidden>Ver frontis guardado ↗</a>
+              </div>
+              <p id="menuVisitFrontisStatus" class="field-help" role="status" aria-live="polite"></p>
+            </div>
+
+            <div class="photo-capture-box">
+              <label for="menuVisitPhotos"><strong>Fotografías adicionales del local</strong>
+                <span class="field-help">Interior autorizado, góndolas, estanterías o productos (selección múltiple).</span>
+              </label>
+              <input id="menuVisitPhotos" type="file" accept="image/*" multiple aria-describedby="menuVisitPhotosStatus">
+              <div class="photo-box-actions">
+                <button id="saveMenuVisitPhotos" class="secondary" type="button">Subir fotografías</button>
+                <span id="menuVisitPhotosCount" class="field-help"></span>
+              </div>
+              <p id="menuVisitPhotosStatus" class="field-help" role="status" aria-live="polite"></p>
+              <div id="menuVisitPhotosGallery" class="photo-gallery-list" hidden></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="visit-actions">
+          <button class="secondary" id="editVisitButton" type="button">Editar datos de visita</button>
+          <details class="backup-group">
+            <summary>Descargar respaldo offline</summary>
+            <p>El respaldo permite recuperar el trabajo de este dispositivo; no sustituye guardar los instrumentos en Sheets.</p>
+            <div class="backup-options">
+              <button class="secondary" id="backupJsonButton" type="button">Descargar JSON</button>
+              <button class="secondary" id="backupHtmlButton" type="button">Descargar HTML</button>
+            </div>
+          </details>
+          <div class="close-visit-group">
+            <div>
+              <strong>Finalizar visita</strong>
+              <p>Guarde los instrumentos en Sheets antes de cerrar. El cierre elimina el borrador de este dispositivo.</p>
+            </div>
+            <button class="danger" id="closeVisitButton" type="button">Cerrar visita</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="availabilityView" class="view" hidden>
+      <div class="card">
+        <h2>Pauta de disponibilidad y variedad</h2>
+        <p>Recorre el local y marca lo que encuentres. La ayuda reúne ejemplos para acompañarte en los casos que suelen generar dudas.</p>
+        <details class="instrument-help">
+          <summary><span class="help-mark" aria-hidden="true">?</span> Ayuda para aplicar esta pauta</summary>
+          <div class="instrument-help-content">
+            <p>Cuando no encuentres un alimento o una preparación, marca «No» y continúa con el siguiente.</p>
+            <ul>
+              <li><strong>Leche baja en grasa:</strong> descremada o semidescremada, líquida o en polvo. <strong>Carnes bajas en grasa:</strong> pollo, pavo y cortes magros como posta.</li>
+              <li>En <strong>aceites vegetales</strong>, considera opciones como oliva, canola y maravilla.</li>
+              <li>En sopas, ensaladas, té, café e infusiones de preparaciones saludables, registra lo que está listo para consumir. Las sopas deshidratadas en sobre no entran en este grupo.</li>
+              <li>Registra por separado <strong>frutas secas</strong> (como pasas o huesillos) y <strong>frutos secos</strong> (como maní o almendras).</li>
+              <li>Para <strong>porciones infantiles</strong>, busca más de una preparación lista para consumir, como menú, plato o sándwich pequeño. Se trata de preparaciones del local, no de alimentos infantiles envasados.</li>
+              <li>En cereales para desayuno, Nestum no corresponde a este grupo. Para granos, considera quínoa, amaranto, arroz integral, trigo mote, avena u otros similares; para pan integral, busca las variedades descritas en la pauta.</li>
+              <li>Al revisar alimentos no saludables, fíjate en los sellos «Alto en» cuando se mencionen. Papas fritas o ramitas, galletas o chocolates y cecinas envasadas son ejemplos que pueden ayudarte a reconocerlos.</li>
+            </ul>
+          </div>
+        </details>
+        <form id="availabilityForm"><label class="required responsible-field">Persona responsable de esta pauta<input id="availabilityResponsible" class="responsible-input" autocomplete="name" placeholder="Nombre o código" required></label><div id="availabilityItems"></div><div class="actions"><button type="submit">Guardar disponibilidad</button><button class="secondary return-menu" type="button">Volver al menú</button></div></form>
+      </div>
+    </section>
+
+    <section id="pricesView" class="view" hidden>
+      <div class="card">
+        <h2>Pauta de registro de precios</h2>
+        <p>Cuéntanos qué encontraste para cada alimento. Anota el precio más bajo y agrega el más alto cuando haya otra opción que cumpla la pauta.</p>
+        <div class="actions"><button id="startPriceProductButton" type="button">Agregar producto</button><button id="openPricesReviewButton" type="button">Revisar precios</button><button class="secondary return-menu" type="button">Volver al menú</button></div>
+      </div>
+    </section>
+
+    <section id="pricesReviewView" class="view" hidden>
+      <div class="card">
+        <h2>Revisión de alimentos y precios</h2>
+        <p>Revisa lo que anotaste. Confirma el precio más bajo y, cuando encontraste otra opción que cumple la pauta, también el más alto.</p>
+        <label class="required responsible-field">Persona responsable de esta pauta<input id="pricesResponsible" class="responsible-input" autocomplete="name" placeholder="Nombre o código" required></label>
+        <div id="priceReviewItems"></div>
+        <label class="wide">Observaciones generales<textarea id="pricesNotes" placeholder="Cuéntanos si ocurrió algo que ayude a entender estos precios."></textarea></label>
+        <div class="actions"><button id="addPriceProduct" type="button">Agregar producto</button><button id="saveReviewedPrices" type="button">Guardar precios</button><button class="secondary return-menu" type="button">Volver al menú</button></div>
+      </div>
+    </section>
+
+    <section id="priceEditorView" class="view" hidden>
+      <div class="card">
+        <h2>Agregar alimento y precios</h2>
+        <p>Anota el precio más bajo y agrega el más alto si encontraste otra opción que cumple la pauta. Si no encuentras el alimento, cuéntanoslo en «Resultado del registro».</p>
+        <form id="priceEditorForm"><div id="priceProducts"></div><div class="actions"><button type="submit">Guardar alimento</button><button class="secondary" id="cancelPriceEditor" type="button">Volver a revisión</button></div></form>
+      </div>
+    </section>
+
+    <section id="classificationView" class="view" hidden>
+      <div class="card">
+        <h2>Pauta de clasificación de establecimientos alimentarios</h2>
+        <p>Pauta opcional. Para clasificar automáticamente como «minimarket» se requiere autoservicio o atención mixta y cumplir al menos dos de los tres criterios de surtido. Una corrección manual exige justificación. <a href="guia-clasificacion.html" target="_blank" rel="noopener">Abrir la guía de clasificación</a></p>
+        <div class="linked-local"><strong>Local identificado:</strong> <span id="classificationLinkedLocal"></span></div>
+        <form id="classificationForm">
+          <label class="required responsible-field">Persona responsable de esta pauta<input id="classificationResponsible" class="responsible-input" autocomplete="name" placeholder="Nombre o código" required></label>
+          <div id="classificationOpenFields">
+            <fieldset><legend>Características generales</legend><div class="grid">
+              <label class="required">Sistema de atención
+                <select id="classificationService" required><option value="">Seleccione</option><option value="autoservicio">Autoservicio</option><option value="transmeson">Tras mesón</option><option value="mixto">Mixto</option></select>
+                <span class="field-help">Autoservicio: la clientela toma por sí misma la mayor parte de los productos y paga en caja. Tras mesón: pide los productos al personal. Mixto: combina ambos sistemas, por ejemplo autoservicio con secciones atendidas de carnes, quesos, alcohol u otros. Mixto cuenta como autoservicio para la clasificación automática.</span>
+              </label>
+              <label>Nº de personas atendiendo al público<input id="classificationPeople" type="number" min="0" max="15"></label>
+            </div></fieldset>
+            <fieldset><legend>Rubros observados</legend>
+              <p class="field-help">Marque solo los rubros presentes. Se cumplen como criterios de minimarket: 10 o más variedades de frutas y hortalizas; lácteos y huevos (ambos); al menos dos categorías proteicas.</p>
+              <div class="rubro-list">
+                <div class="rubro">
+                  <label class="checkbox-field"><input id="rubroProduce" type="checkbox"> Frutas y hortalizas frescas</label>
+                  <label id="produceVarietiesField" class="required rubro-detail" hidden>Número de variedades observadas<input id="classificationProduceVarieties" type="number" min="0" step="1"></label>
+                </div>
+                <div class="rubro">
+                  <label class="checkbox-field"><input id="rubroMeat" type="checkbox"> Carne fresca</label>
+                  <div id="meatTypesField" class="rubro-detail protein-categories" hidden>
+                    <label class="checkbox-field"><input type="checkbox" name="proteinCategory" value="vacuno"> Vacuno</label>
+                    <label class="checkbox-field"><input type="checkbox" name="proteinCategory" value="cerdo"> Cerdo</label>
+                    <label class="checkbox-field"><input type="checkbox" name="proteinCategory" value="pollo"> Pollo</label>
+                    <label class="checkbox-field"><input type="checkbox" name="proteinCategory" value="cordero"> Cordero</label>
+                  </div>
+                </div>
+                <div class="rubro"><label class="checkbox-field"><input type="checkbox" name="proteinCategory" value="pescados_mariscos"> Pescados y mariscos congelados</label></div>
+                <div class="rubro"><label class="checkbox-field"><input id="rubroDairy" type="checkbox"> Lácteos</label></div>
+                <div class="rubro"><label class="checkbox-field"><input id="rubroEggs" type="checkbox"> Huevos</label></div>
+              </div>
+            </fieldset>
+            <fieldset><legend>Resultado</legend><p id="classificationResult" class="classification-result" aria-live="polite">Complete los campos para calcular.</p><label>Corrección manual<select id="classificationOverride"><option value="">Mantener clasificación automática</option><option value="minimarket">Corregir a MINIMARKET</option><option value="almacen_barrio">Corregir a ALMACÉN DE BARRIO</option></select></label><label id="classificationJustificationField" hidden>Motivo de la corrección<textarea id="classificationJustification"></textarea></label></fieldset>
+          </div>
+          <label>Observaciones<textarea id="classificationNotes"></textarea></label>
+          <div class="actions"><button type="submit">Guardar clasificación</button><button class="secondary return-menu" type="button">Volver al menú</button></div>
+        </form>
+      </div>
+    </section>
+
+    <section id="originsView" class="view" hidden>
+      <div class="card">
+        <h2>Pauta de registro de origen</h2>
+        <p>Si encuentras un producto que viene de Aysén, cuéntanos qué lo confirma: una etiqueta, un cartel o lo que te indique quien atiende. Si sabes que es de la región pero no conoces la comuna, elige «Sin información de comuna» y anota la evidencia.</p>
+        <form id="originsForm"><label class="required responsible-field">Persona responsable de esta pauta<input id="originsResponsible" class="responsible-input" autocomplete="name" placeholder="Nombre o código" required></label><div id="originItems"></div><label class="checkbox-field"><input id="originsNone" type="checkbox"> No se observaron productos de origen regional en este local</label><div class="actions"><button class="secondary" id="addOriginItem" type="button">Agregar producto regional</button><button type="submit">Guardar origen</button><button class="secondary return-menu" type="button">Volver al menú</button></div></form>
+      </div>
+    </section>
+
+    <template id="availabilityTemplate"><fieldset class="instrument-group"><legend></legend><div class="availability-rows"></div></fieldset></template>
+    <template id="priceProductTemplate"><article class="card product-card"><button class="remove-product" type="button">Quitar alimento</button><div class="grid"><fieldset class="price-product-picker wide"><legend class="required">Alimento centinela</legend><div class="price-product-selected" hidden><strong class="price-product-selected-name"></strong><button class="secondary price-product-change" type="button">Cambiar alimento</button></div><label class="price-search-label">Buscar alimento<input class="price-product-search" type="search" placeholder="Ej.: tomate" autocomplete="off"></label><div class="price-product-categories" role="group" aria-label="Filtrar alimentos por grupo"></div><div class="price-product-options" role="radiogroup" aria-label="Alimentos"></div><p class="price-product-empty" hidden>No encontramos alimentos con ese nombre. Prueba con otra palabra.</p></fieldset><label>Grupo<input class="price-category" readonly></label><p class="price-guidance wide" aria-live="polite" hidden></p><label class="required wide">Resultado del registro<select class="price-status" required><option value="precio_obtenido">Precio obtenido</option><option value="producto_no_disponible">Producto no disponible</option><option value="precio_no_obtenido">No fue posible obtener el precio</option></select><span class="field-help">¿Viste el alimento, pero no pudiste confirmar su precio? Elige «No fue posible obtener el precio».</span></label></div><div class="price-observations"></div></article></template>
+    <template id="priceObservationTemplate"><div class="price-observation"><p class="price-range-label">Precio <strong></strong></p><div class="grid"><label class="brand-field">Marca<input class="brand"></label><label class="price-field">Precio observado (CLP)<input class="price-value" type="number" min="0" step="1"></label><label class="unit-field">Unidad de medida<select class="unit"></select></label><label>¿Está en oferta?<select class="promotion"><option value="No">No</option><option value="Sí">Sí</option></select></label><label class="wide">Observaciones<textarea class="notes" placeholder="Obligatorio si la unidad es «Otros»: indique el formato."></textarea></label></div></div></template>
+    <template id="originItemTemplate"><article class="card origin-item"><button class="remove-origin" type="button">Quitar producto</button><div class="grid"><fieldset class="origin-choice-picker"><legend class="required">Categoría alimentaria</legend><div class="origin-choice-summary" hidden><strong class="origin-choice-value"></strong><button class="secondary origin-choice-change" type="button">Cambiar</button></div><div class="origin-category-options origin-choice-options" role="radiogroup" aria-label="Categorías alimentarias"></div></fieldset><label class="required">Variedad del producto<input class="origin-variety" required placeholder="Ejemplo: frutilla"></label><label class="required">Comuna de origen declarada<select class="origin-commune" required></select></label><label>Sector o localidad específica<input class="origin-sector"></label><label>Marca o productor regional<input class="origin-brand"></label><fieldset class="origin-choice-picker"><legend class="required">¿Qué te confirmó el origen?</legend><div class="origin-choice-summary" hidden><strong class="origin-choice-value"></strong><button class="secondary origin-choice-change" type="button">Cambiar</button></div><div class="origin-source-options origin-choice-options" role="radiogroup" aria-label="Fuentes de origen"></div></fieldset><label class="wide">Observaciones<span class="field-help">Cuéntanos qué viste o quién te dio la información. Te pediremos este dato si no aparece la comuna o eliges «Otra».</span><textarea class="origin-notes" placeholder="Describe la evidencia de origen en Aysén."></textarea></label></div></article></template>
+
+    <footer class="site-footer">
+      <p class="footer-brand"><strong>ESPORA Coyhaique</strong> · Economía Social, Precios, Orgánicos, Residuos y Alimentación</p>
+      <div class="project-credits" aria-label="Créditos del proyecto">
+        <p><strong>Financia:</strong> FAO Chile</p>
+        <p><strong>Ejecuta:</strong> Dr. Esteban Cofré Morales · Universidad de Aysén</p>
+      </div>
+    </footer>
+  </main>
+  <script src="sample-locals.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

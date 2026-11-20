@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f5a48">
+  <title>Accesos · Nuevo estudio</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #183346; background: #f3f7f4; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; }
+    main { max-width: 1030px; margin: auto; padding: 28px 24px 60px; }
+    header { display: flex; align-items: center; gap: 14px; padding-bottom: 20px; border-bottom: 1px solid #d5e1df; }
+    header img { width: 52px; height: auto; }
+    header strong { display: block; color: #153f34; font-size: 19px; }
+    header span { display: block; color: #526a76; font-size: 14px; }
+    .intro { padding: 45px 0 28px; max-width: 720px; }
+    h1 { margin: 0 0 12px; color: #153f34; font-size: clamp(30px, 5vw, 46px); line-height: 1.1; }
+    h2 { margin: 0 0 8px; color: #153f34; font-size: 20px; }
+    p { line-height: 1.55; }
+    .intro p, .description, .help { color: #526a76; }
+    .intro p { font-size: 17px; margin: 0; }
+    .access-list { border-top: 1px solid #c8d9d2; }
+    .access-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px 30px; border-bottom: 1px solid #c8d9d2; padding: 23px 0; }
+    .access-row h2 { margin: 0 0 5px; }
+    .description { margin: 0; font-size: 15px; }
+    .action { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 17px; border: 1px solid #1f5a48; border-radius: 6px; background: #1f5a48; color: white; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+    .action:hover { background: #153f34; }
+    .action.secondary { color: #1f5a48; background: white; }
+    .action.secondary:hover { background: #e5f2ee; }
+    :focus-visible { outline: 3px solid #0f7180; outline-offset: 3px; }
+    .pending { color: #675020; font-size: 14px; text-align: right; }
+    .setup { margin-top: 34px; padding: 24px; background: white; border: 1px solid #d5e1df; border-radius: 8px; }
+    .setup summary { color: #153f34; cursor: pointer; font-size: 18px; font-weight: 700; }
+    .setup p { margin: 14px 0; }
+    label { display: block; color: #183346; font-weight: 700; }
+    input { width: 100%; margin-top: 8px; padding: 12px; border: 1px solid #819994; border-radius: 5px; font: inherit; }
+    .form-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .help, .message { font-size: 14px; }
+    .message { margin-bottom: 0; color: #1f5a48; }
+    .message.error { color: #a32018; }
+    .sheets { margin-top: 32px; color: #526a76; font-size: 14px; }
+    .sheets strong { color: #183346; }
+    @media (max-width: 600px) {
+      main { padding: 20px 18px 40px; }
+      .intro { padding: 34px 0 24px; }
+      .access-row { grid-template-columns: 1fr; gap: 12px; }
+      .access-row .action { justify-self: start; }
+      .pending { text-align: left; }
+      .setup { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="assets/espora-arbol-bosque.png" alt="">
+      <div><strong>ESPORA</strong><span>Accesos del nuevo estudio</span></div>
+    </header>
+
+    <section class="intro">
+      <h1>Tu espacio de trabajo</h1>
+      <p>Entra a la captura o al portal de gestión. Esta copia es independiente del estudio anterior.</p>
+    </section>
+
+    <nav class="access-list" aria-label="Plataformas del nuevo estudio">
+      <div class="access-row">
+        <div><h2>Captura en terreno</h2><p class="description">Registra visitas, disponibilidad y precios.</p></div>
+        <a class="action" href="index.html">Abrir captura <span aria-hidden="true">&nbsp;↗</span></a>
+      </div>
+      <div class="access-row">
+        <div><h2>Administración</h2><p class="description">Gestiona locales, aplicadores y seguimiento.</p></div>
+        <a id="adminLink" class="action secondary" target="_blank" rel="noopener noreferrer" hidden>Abrir administración <span aria-hidden="true">&nbsp;↗</span></a>
+        <span class="pending" data-pending>Configura el enlace del portal abajo.</span>
+      </div>
+      <div class="access-row">
+        <div><h2>Portal de aplicadores</h2><p class="description">Consulta la cartera y las tareas asignadas.</p></div>
+        <a id="collectorLink" class="action secondary" target="_blank" rel="noopener noreferrer" hidden>Abrir portal del equipo <span aria-hidden="true">&nbsp;↗</span></a>
+        <span class="pending" data-pending>Configura el enlace del portal abajo.</span>
+      </div>
+    </nav>
+
+    <details class="setup" id="setup">
+      <summary>Configurar el enlace de gestión</summary>
+      <p class="help">Después de publicar el nuevo proyecto Apps Script de gestión, pega su URL de implementación terminada en <code>/exec</code>. El enlace del equipo se genera a partir de ella.</p>
+      <form id="urlForm">
+        <label for="portalUrl">URL del portal de gestión</label>
+        <input id="portalUrl" type="url" autocomplete="url" placeholder="https://script.google.com/…/exec" required>
+        <div class="form-actions">
+          <button class="action" type="submit">Guardar enlace</button>
+          <button class="action secondary" id="clearUrl" type="button">Quitar enlace</button>
+        </div>
+        <p id="status" class="message" role="status" aria-live="polite"></p>
+      </form>
+      <p class="help">Puedes reemplazar el enlace preconfigurado en este navegador; no se guardan contraseñas. No uses la URL del estudio anterior.</p>
+    </details>
+
+    <p class="sheets"><strong>Preparación:</strong> usa dos planillas y dos proyectos Apps Script nuevos e independientes. Las instrucciones están en el archivo local <code>README.md</code>.</p>
+  </main>
+  <script>
+    const storageKey = 'esporaNuevoEstudioPortalUrlV1';
+    const defaultPortalUrl = 'https://script.google.com/macros/s/AKfycbxiiF_WdOZK-zOe977GjqJU6q4nBHvfjGSdJ3SQqrysSewZKxijs7GcI6RCrrluiSg29A/exec';
+    const form = document.getElementById('urlForm');
+    const input = document.getElementById('portalUrl');
+    const status = document.getElementById('status');
+    const admin = document.getElementById('adminLink');
+    const collector = document.getElementById('collectorLink');
+    const pending = document.querySelectorAll('[data-pending]');
+
+    function portalUrl(value) {
+      let url;
+      try { url = new URL(value.trim()); } catch (error) { throw new Error('Ingresa una URL válida del portal de gestión.'); }
+      if (url.protocol !== 'https:' || url.hostname !== 'script.google.com' || url.port || url.username || url.password || !url.pathname.endsWith('/exec')) {
+        throw new Error('Usa la URL HTTPS de Google Apps Script terminada en /exec.');
+      }
+      url.searchParams.delete('view');
+      url.hash = '';
+      return url;
+    }
+
+    function render(url) {
+      admin.hidden = !url;
+      collector.hidden = !url;
+      pending.forEach((item) => { item.hidden = Boolean(url); });
+      if (!url) {
+        admin.removeAttribute('href');
+        collector.removeAttribute('href');
+        return;
+      }
+      admin.href = url.href;
+      const teamUrl = new URL(url.href);
+      teamUrl.searchParams.set('view', 'collector');
+      collector.href = teamUrl.href;
+    }
+
+    function message(text, isError) {
+      status.textContent = text;
+      status.classList.toggle('error', Boolean(isError));
+      status.setAttribute('role', isError ? 'alert' : 'status');
+    }
+
+    try {
+      const saved = localStorage.getItem(storageKey);
+      const configured = saved === null ? defaultPortalUrl : saved;
+      if (configured) {
+        const url = portalUrl(configured);
+        input.value = url.href;
+        render(url);
+      }
+    } catch (error) {
+      message('No se pudo cargar el enlace guardado. Vuelve a configurarlo.', true);
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      let url;
+      try { url = portalUrl(input.value); } catch (error) { message(error.message, true); return; }
+      input.value = url.href;
+      render(url);
+      try {
+        localStorage.setItem(storageKey, url.href);
+        message('Enlace guardado en este navegador.', false);
+      } catch (error) {
+        message('El enlace funciona durante esta sesión, pero el navegador no permitió guardarlo.', true);
+      }
+    });
+
+    document.getElementById('clearUrl').addEventListener('click', () => {
+      try {
+        localStorage.setItem(storageKey, '');
+        input.value = '';
+        render(null);
+        message('Enlace eliminado de este navegador.', false);
+      } catch (error) {
+        message('No se pudo eliminar el enlace guardado del navegador.', true);
+      }
+    });
+  </script>
+</body>
+</html>

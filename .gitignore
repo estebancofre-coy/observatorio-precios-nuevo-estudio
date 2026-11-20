@@ -1,0 +1,6 @@
+# Herramientas locales y cache
+.impeccable/
+
+# Respuestas reales de investigacion: solo analisis local
+data/
+
