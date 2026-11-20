@@ -324,6 +324,7 @@ function updateLocal({ restore = false } = {}) {
   $('#localCode').required = !isNew;
   ['newLocalName', 'newLocalAddress', 'newLocalType'].forEach((id) => { $('#' + id).required = isNew; });
   if (isNew) {
+    code.setCustomValidity('');
     const initials = currentInitials();
     const codeField = $('#newLocalCode');
     if (initials.length < 2) {
@@ -389,6 +390,7 @@ function fillVisit(visit) {
   $('#interiorPhotoAuthorization').value = visit.interiorPhotoAuthorization || 'No consultada';
   updateCollectorHint();
   $('#isNewLocal').checked = Boolean(visit.isNewLocal);
+  $('#isExistingLocal').checked = !visit.isNewLocal;
   const searchInput = $('#localSearch');
   if (searchInput) searchInput.value = '';
   populateLocalCodeOptions('');
@@ -1310,6 +1312,7 @@ function initialize() {
   if (profile) { $('#collector').value = profile.name || ''; }
   updateCollectorHint();
   if (draft) { fillVisit(draft); showView('menuView'); updateMenu(); }
+  else updateLocal();
   const searchInput = $('#localSearch');
   if (searchInput) {
     searchInput.addEventListener('input', (event) => {
@@ -1352,13 +1355,15 @@ function initialize() {
     $('#newLocalCode').value = newLocalCode(initials);
     showMessage('Código nuevo asignado: ' + $('#newLocalCode').value, 'success');
   });
-  $('#isNewLocal').addEventListener('change', () => {
+  function changeLocalMode() {
     if ($('#isNewLocal').checked) {
       $('#latitude').value = '';
       $('#longitude').value = '';
     }
     updateLocal();
-  });
+  }
+  $('#isNewLocal').addEventListener('change', changeLocalMode);
+  $('#isExistingLocal').addEventListener('change', changeLocalMode);
   ['newLocalName', 'newLocalType'].forEach((id) => $('#' + id).addEventListener('input', updateLocal));
   $('#locationButton').addEventListener('click', useCurrentLocation);
   $('#saveVisitFrontis').addEventListener('click', () => saveVisitFrontis_().catch((error) => showMessage(errorText_(error), 'error')));
@@ -1396,7 +1401,9 @@ function initialize() {
     if (!confirm(warning)) return;
     localStorage.removeItem(DRAFT_KEY);
     $('#visitForm').reset();
-    clearLocalSearch_();
+    populateLocalCodeOptions('');
+    updateCollectorHint();
+    updateLocal();
     renderVisitFrontis_(null);
     renderVisitPhotos_(null);
     $('#observationDate').value = new Date().toISOString().slice(0, 10);

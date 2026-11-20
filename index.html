@@ -37,8 +37,7 @@
           <h2 id="heroTitle">ESPORA</h2>
           <p class="hero-summary">Un estudio piloto en el contexto de la Universidad de Aysén para observar los comercios, alimentos y economías que dan forma a Coyhaique.</p>
           <div class="hero-actions">
-            <a class="hero-action primary" href="#resumeVisitPanel">Retomar una visita pendiente <span aria-hidden="true">↓</span></a>
-            <a class="hero-action secondary" href="#visitForm">Iniciar una visita nueva</a>
+            <a class="hero-action primary" href="#visitForm">Registrar un local nuevo <span aria-hidden="true">↓</span></a>
           </div>
           <div class="hero-tags" aria-label="Instituciones y marco de referencia">
             <span>Universidad de Aysén</span>
@@ -54,15 +53,9 @@
           <img class="paper paper-leaves" src="assets/espora-hojas.png" alt="">
         </div>
       </section>
-      <section id="resumeVisitPanel" class="resume-visit-panel" aria-labelledby="resumeVisitTitle">
-        <div class="resume-intro">
-          <span class="resume-mark" aria-hidden="true">↗</span>
-          <div>
-            <p class="eyebrow">¿YA HAY UNA VISITA EN CURSO?</p>
-            <h2 id="resumeVisitTitle">Retome el trabajo donde quedó</h2>
-            <p>Busque la visita por código de local y continúe con Disponibilidad o Precios.</p>
-          </div>
-        </div>
+      <details id="resumeVisitPanel" class="resume-visit-panel">
+        <summary>Retomar una visita existente</summary>
+        <p>Busque la visita por código de local y continúe con Disponibilidad o Precios.</p>
         <form id="resumeVisitForm" class="resume-visit-search">
           <label class="required" for="resumeLocalCode">Código del local<input id="resumeLocalCode" autocomplete="off" placeholder="Código del local" required></label>
           <label class="required" for="resumeAccessCode">Clave compartida del equipo<input id="resumeAccessCode" type="password" autocomplete="off" required></label>
@@ -70,7 +63,7 @@
         </form>
         <p class="resume-connection-note">Necesita conexión a internet para buscar y cargar la visita en este dispositivo.</p>
         <div id="resumeVisitResults" class="resume-visit-results" aria-live="polite"></div>
-      </section>
+      </details>
 
 
       <div class="card visit-card">
@@ -88,7 +81,12 @@
             <label class="required">Persona que identifica el local<input id="collector" autocomplete="name" placeholder="Nombre y apellidos" required>
               <span class="field-help" id="collectorCodeHint">Escriba nombre y apellidos. Sus iniciales se agregan solas al código de los locales nuevos.</span>
             </label>
-            <div id="sampleLocalFields" class="wide">
+            <fieldset class="wide local-mode">
+              <legend>¿Qué local desea registrar?</legend>
+              <label class="checkbox-field"><input id="isNewLocal" name="localMode" type="radio" checked> Local nuevo</label>
+              <label class="checkbox-field"><input id="isExistingLocal" name="localMode" type="radio"> Local de la muestra</label>
+            </fieldset>
+            <div id="sampleLocalFields" class="wide" hidden>
               <div class="field-stack local-search-stack">
                 <label for="localSearch">Buscar local en la muestra</label>
                 <div class="local-search-input-wrap">
@@ -100,28 +98,24 @@
                 </div>
               </div>
               <label class="required wide" for="localCode">Local de la muestra
-                <select id="localCode" required>
+                <select id="localCode">
                   <option value="">Seleccione un local…</option>
                 </select>
               </label>
               <p class="field-help">La lista muestra código, nombre y dirección para identificar el local sin memorizar el número.</p>
             </div>
-            <div class="wide new-local-choice">
-              <label class="checkbox-field"><input id="isNewLocal" type="checkbox"> No aparece en la lista: registrar un local nuevo</label>
-              <p class="field-help">Revise la lista por código, nombre y dirección. Active esta opción solo si el local no está registrado.</p>
-            </div>
-            <div id="newLocalFields" class="wide" hidden>
+            <div id="newLocalFields" class="wide">
               <div class="grid new-local-grid">
                 <div class="code-field wide">
                   <label>Código asignado<input id="newLocalCode" readonly></label>
                   <button class="secondary" id="regenerateCodeButton" type="button">Generar otro código</button>
                 </div>
-                <label class="required">Nombre del nuevo local<input id="newLocalName" placeholder="Ejemplo: Almacén del barrio"></label>
+                <label class="required">Nombre del nuevo local<input id="newLocalName" placeholder="Ejemplo: Almacén del barrio" required></label>
                 <div class="field-stack">
-                  <label class="required">Dirección o referencia<input id="newLocalAddress" placeholder="Calle, número o referencia"></label>
+                  <label class="required">Dirección o referencia<input id="newLocalAddress" placeholder="Calle, número o referencia" required></label>
                   <span class="field-help">Ingrese una dirección o referencia que permita reconocer el local en el mapa.</span>
                 </div>
-                <label class="required">Tipo de local<select id="newLocalType"><option value="">Seleccione</option><option value="Almacén o minimarket">Almacén o minimarket</option><option>Supermercado</option><option>Venta de Frutas y Verduras</option><option>Mercado Campesino</option><option>Productor Hortícola</option><option>Otro</option></select></label>
+                <label class="required">Tipo de local<select id="newLocalType" required><option value="">Seleccione</option><option value="Almacén o minimarket">Almacén o minimarket</option><option>Supermercado</option><option>Venta de Frutas y Verduras</option><option>Mercado Campesino</option><option>Productor Hortícola</option><option>Otro</option></select></label>
               </div>
               <p class="field-help">Use «Generar otro código» solo si el sistema avisa que el código ya está ocupado.</p>
             </div>

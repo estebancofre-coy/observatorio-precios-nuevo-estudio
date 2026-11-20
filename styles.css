@@ -82,11 +82,12 @@ button.danger { background: #b3261e; color: #fff; flex: 0 0 auto; }
 button.danger:hover { background: #8c1d18; }
 .visit-save-status { background: #fef7e0; border-radius: 6px; color: #6b4400; margin: 12px 0 0; padding: 10px 12px; }
 .visit-save-status:empty { display: none; }
-.resume-visit-panel { background: #e8f3ec; border: 1px solid #a8cbb6; border-radius: 12px; box-shadow: 0 8px 22px rgba(30, 70, 70, .08); margin: 18px 0; padding: 22px 24px; }
-.resume-intro { align-items: flex-start; display: flex; gap: 16px; margin-bottom: 18px; max-width: 780px; }
-.resume-mark { align-items: center; background: #1f5a48; border-radius: 50%; color: #fff; display: flex; flex: 0 0 42px; font-size: 22px; height: 42px; justify-content: center; }
-.resume-intro h2 { color: #183f33; font-size: 21px; margin: 4px 0 6px; }
-.resume-intro p:last-child { line-height: 1.55; margin: 0; max-width: 68ch; }
+.resume-visit-panel { background: #f8fbf9; border: 1px solid #c8dcd0; border-radius: 8px; margin: 16px 0; padding: 14px 18px; }
+.resume-visit-panel summary { color: #1f5a48; cursor: pointer; font-size: 14px; font-weight: 700; }
+.resume-visit-panel summary:focus-visible { outline: 3px solid #0f7180; outline-offset: 3px; }
+.resume-visit-panel > p { line-height: 1.5; }
+.local-mode { border: 0; display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 0; padding: 0; }
+.local-mode legend { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
 .resume-visit-search { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
 .resume-visit-search label { min-width: 0; }
 .resume-visit-search input { margin-top: 0; min-width: 0; }
