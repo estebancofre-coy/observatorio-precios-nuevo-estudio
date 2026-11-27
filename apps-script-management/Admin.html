@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1f5a48">
+    <meta name="description" content="Panel ESPORA para distribuir la cartera de locales y planificar el trabajo de terreno.">
+    <title>ESPORA · Administración de terreno</title>
+    <?!= include('Styles'); ?>
+  </head>
+  <body data-portal-role="admin" class="admin-page">
+    <main class="shell admin-shell">
+      <header class="masthead">
+        <a class="brand" href="#" aria-label="ESPORA, administración de terreno">
+          <span class="brand-mark" aria-hidden="true">E</span>
+          <span><strong>ESPORA</strong><small>Administración de terreno</small></span>
+        </a>
+        <span id="sessionBadge" class="session-badge" hidden></span>
+      </header>
+
+      <p class="desktop-note">El panel de administración está diseñado para computador. Abre esta página en una pantalla de al menos 1100 px de ancho.</p>
+
+      <section id="loginView" class="login-layout admin-login" aria-labelledby="loginTitle">
+        <div class="login-intro">
+          <h1 id="loginTitle">Coordina el trabajo de campo.</h1>
+          <p>Distribuye la cartera de locales, define las pautas de cada uno y sigue lo que ya llegó a la captura.</p>
+          <p class="separation-note"><span aria-hidden="true">↗</span> La cartera y las asignaciones viven en la planilla operativa; las respuestas de investigación solo se leen.</p>
+        </div>
+        <form id="loginForm" class="login-form">
+          <h2>Administración</h2>
+          <label for="loginEmail">Correo institucional</label>
+          <input id="loginEmail" name="email" type="email" autocomplete="username" maxlength="254" required>
+          <label for="credential">Clave de acceso</label>
+          <div class="password-field"><input id="credential" name="password" type="password" autocomplete="current-password" required><button class="password-toggle" type="button" data-toggle-password="credential" aria-label="Mostrar clave">Mostrar</button></div>
+          <p class="form-help">Usa tu clave temporal la primera vez; el portal te pedirá crear una clave personal.</p>
+          <p id="loginError" class="form-message error" role="alert" hidden></p>
+          <button class="primary-button" id="loginButton" type="submit">Entrar a coordinación</button>
+          <button class="text-button" id="forgotPasswordLink" type="button">¿Olvidaste tu clave?</button>
+          <p class="form-help">¿Eres del equipo de terreno? <a id="teamPortalLink" href="<?= collectorUrl ?>" target="_top">Portal del equipo de terreno</a></p>
+        </form>
+      </section>
+
+      <section id="passwordChangeView" class="credential-stage" aria-labelledby="passwordChangeTitle" hidden>
+        <form id="passwordChangeForm" class="login-form credential-form">
+          <h1 id="passwordChangeTitle">Crea tu clave personal</h1>
+          <p>La clave temporal solo sirve para este primer ingreso. Elige una clave nueva que no hayas usado en otra cuenta.</p>
+          <label for="changePassword">Nueva clave</label>
+          <div class="password-field"><input id="changePassword" type="password" autocomplete="new-password" minlength="12" required><button class="password-toggle" type="button" data-toggle-password="changePassword" aria-label="Mostrar clave">Mostrar</button></div>
+          <ul id="passwordRules" class="password-rules" aria-live="polite">
+            <li data-rule="length">Al menos 12 caracteres</li><li data-rule="letter">Incluye una letra</li>
+            <li data-rule="number">Incluye un número</li><li data-rule="special">Incluye un carácter especial</li>
+          </ul>
+          <label for="changePasswordConfirm">Repite la nueva clave</label>
+          <div class="password-field"><input id="changePasswordConfirm" type="password" autocomplete="new-password" minlength="12" required><button class="password-toggle" type="button" data-toggle-password="changePasswordConfirm" aria-label="Mostrar confirmación">Mostrar</button></div>
+          <p class="form-help">Puedes usar un gestor de contraseñas. Comprueba que ambas claves coincidan antes de guardar.</p>
+          <p id="passwordChangeError" class="form-message error" role="alert" hidden></p>
+          <button id="changePasswordButton" class="primary-button" type="submit">Guardar clave personal</button>
+          <button class="quiet-button logout-button" type="button">Cerrar sesión</button>
+        </form>
+      </section>
+
+      <section id="resetView" class="credential-stage" aria-labelledby="resetTitle" hidden>
+        <div class="login-form credential-form">
+          <h1 id="resetTitle">Recupera tu acceso</h1>
+          <p>Solicita un código de un solo uso al correo de tu cuenta. Vence en 10 minutos.</p>
+          <form id="resetRequestForm">
+            <label for="resetEmail">Correo asociado a ESPORA</label>
+            <input id="resetEmail" type="email" autocomplete="email" maxlength="254" required>
+            <p id="resetRequestMessage" class="form-message" role="status" aria-live="polite" hidden></p>
+            <button id="resetRequestButton" class="secondary-button" type="submit">Enviar código de recuperación</button>
+          </form>
+          <form id="resetCompleteForm" class="reset-complete-form">
+            <label for="resetCode">Código de recuperación</label>
+            <input id="resetCode" type="text" inputmode="text" autocomplete="one-time-code" maxlength="12" autocapitalize="characters" required>
+            <label for="resetPassword">Nueva clave personal</label>
+            <div class="password-field"><input id="resetPassword" type="password" autocomplete="new-password" minlength="12" required><button class="password-toggle" type="button" data-toggle-password="resetPassword" aria-label="Mostrar clave">Mostrar</button></div>
+            <ul id="resetPasswordRules" class="password-rules" aria-live="polite">
+              <li data-rule="length">Al menos 12 caracteres</li><li data-rule="letter">Incluye una letra</li>
+              <li data-rule="number">Incluye un número</li><li data-rule="special">Incluye un carácter especial</li>
+            </ul>
+            <label for="resetPasswordConfirm">Repite la nueva clave</label>
+            <div class="password-field"><input id="resetPasswordConfirm" type="password" autocomplete="new-password" minlength="12" required><button class="password-toggle" type="button" data-toggle-password="resetPasswordConfirm" aria-label="Mostrar confirmación">Mostrar</button></div>
+            <p id="resetError" class="form-message error" role="alert" hidden></p>
+            <button id="resetCompleteButton" class="primary-button" type="submit">Actualizar clave</button>
+          </form>
+          <button class="text-button" id="backToLogin" type="button">Volver al ingreso</button>
+        </div>
+      </section>
+
+      <section id="portalView" hidden>
+        <div id="portalAlert" class="notice" role="status" hidden></div>
+        <div class="page-heading">
+          <h1>Cartera y jornada</h1>
+          <button class="quiet-button logout-button" type="button">Cerrar sesión</button>
+        </div>
+
+        <details class="work-area">
+          <summary>Registros de investigación</summary>
+          <p>Observaciones generales y metadatos de transcripciones. El acceso a los archivos depende también de los permisos de Google Drive.</p>
+          <button type="button" class="secondary-button" id="loadResearchRecords">Consultar registros</button>
+          <div id="researchRecords" aria-live="polite"></div>
+        </details>
+
+        <section class="work-area" aria-labelledby="teamAccountsTitle">
+          <div class="section-title">
+            <div>
+              <h2 id="teamAccountsTitle">Crear acceso para aplicadores</h2>
+              <p>La persona recibirá una clave temporal por correo y deberá cambiarla al ingresar.</p>
+            </div>
+          </div>
+          <form id="createCollectorForm" class="collector-account-form">
+            <label for="collectorAccountName">Nombre completo
+              <input id="collectorAccountName" maxlength="100" autocomplete="name" required>
+            </label>
+            <label for="collectorAccountEmail">Correo electrónico
+              <input id="collectorAccountEmail" type="email" maxlength="254" autocomplete="email" required>
+            </label>
+            <button id="createCollectorButton" class="primary-button" type="submit">Crear y enviar acceso</button>
+          </form>
+          <p id="createCollectorStatus" class="form-message" role="status" aria-live="polite" hidden></p>
+        </section>
+
+        <section class="work-area operations-dashboard" aria-labelledby="dashboardTitle">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">LECTURA OPERATIVA</p>
+              <h2 id="dashboardTitle">Pulso de la cartera</h2>
+              <p>Avance de captura, pautas pendientes y señales para coordinar el trabajo. No interpreta resultados de investigación.</p>
+              <p class="dashboard-method">La cobertura indica que existe al menos un registro de la pauta requerida; no valida su contenido. El avance se agrupa por responsable de cartera, aunque otra persona haya realizado la visita.</p>
+            </div>
+            <p id="dashboardAsOf" class="list-summary"></p>
+          </div>
+          <p id="dashboardNotice" class="dashboard-notice" role="status" hidden></p>
+          <div id="dashboardMetrics" class="dashboard-metrics" aria-live="polite"></div>
+          <div class="dashboard-columns">
+            <section class="dashboard-panel" aria-labelledby="instrumentCoverageTitle">
+              <h3 id="instrumentCoverageTitle">Cobertura por pauta</h3>
+              <div id="dashboardInstrumentCoverage"></div>
+            </section>
+            <section class="dashboard-panel" aria-labelledby="collectorProgressTitle">
+              <h3 id="collectorProgressTitle">Avance por aplicador/a</h3>
+              <div id="dashboardCollectorProgress"></div>
+            </section>
+          </div>
+          <div class="dashboard-columns">
+            <section class="dashboard-panel dashboard-signals" aria-labelledby="dashboardSignalsTitle">
+              <h3 id="dashboardSignalsTitle">Sugerencias de coordinación</h3>
+              <ul id="dashboardSuggestions" class="dashboard-suggestions"></ul>
+            </section>
+            <section class="dashboard-panel" aria-labelledby="overdueTitle">
+              <h3 id="overdueTitle">Programaciones pasadas con pendientes</h3>
+              <p class="dashboard-method">Se señalan fechas anteriores a hoy con pautas sin marcar «Completo» o «No aplica». Es una señal para confirmar con el equipo, no prueba por sí sola un atraso.</p>
+              <div id="dashboardOverdue"></div>
+            </section>
+          </div>
+          <section class="dashboard-panel dashboard-timing" aria-labelledby="dashboardTimingTitle">
+            <h3 id="dashboardTimingTitle">Tiempos de aplicación</h3>
+            <p class="dashboard-method">Tiempo transcurrido mientras cada pauta está abierta en primer plano; se pausa al cambiar de pestaña o salir de la pauta. El total de visita suma una vez cada pauta guardada. Disponibilidad y variedad cuenta como una pauta por visita, no sus filas internas. Los promedios usan solo registros con medición; las visitas anteriores no tienen tiempos retroactivos.</p>
+            <div class="dashboard-columns">
+              <section class="dashboard-panel dashboard-timing-summary" aria-labelledby="instrumentTimingTitle">
+                <h4 id="instrumentTimingTitle">Promedio por instrumento</h4>
+                <div id="dashboardInstrumentTimes"></div>
+                <div id="dashboardVisitTimeAverage"></div>
+              </section>
+              <section class="dashboard-panel dashboard-recent-timing" aria-labelledby="recentTimingTitle">
+                <h4 id="recentTimingTitle">Visitas recientes con tiempo registrado</h4>
+                <div id="dashboardRecentVisitTimes"></div>
+              </section>
+            </div>
+          </section>
+        </section>
+
+        <section class="work-area research-statistics" aria-labelledby="researchTitle">
+          <div class="section-title">
+            <div>
+              <h2 id="researchTitle">Resultados de las respuestas</h2>
+              <p>Estadísticos descriptivos de los locales reportados, separados del avance operativo.</p>
+            </div>
+            <button id="refreshResearch" class="quiet-button" type="button">Actualizar resultados</button>
+          </div>
+          <p class="dashboard-method">Se usa la pauta guardada más recientemente por local y el tipo declarado en el padrón o la visita. No se suman visitas repetidas.</p>
+          <p id="researchStatus" class="dashboard-notice" role="status">Cargando resultados…</p>
+          <section aria-labelledby="researchClassificationTitle" hidden>
+            <h3 id="researchClassificationTitle">Categorización final de almacenes y minimarkets</h3>
+            <p class="dashboard-method">Un local por código. El porcentaje usa todos los almacenes/minimarkets con visita, incluidos los que todavía no tienen clasificación final válida. No se sustituye el resultado observado por la preclasificación.</p>
+            <div id="researchClassification"></div>
+          </section>
+          <label for="researchType">Desglosar los instrumentos por tipo de local</label>
+          <select id="researchType" disabled><option>Sin resultados cargados</option></select>
+          <p id="researchSample" class="list-summary" aria-live="polite"></p>
+          <section aria-labelledby="researchAvailabilityTitle">
+            <h3 id="researchAvailabilityTitle">Disponibilidad saludable y no saludable</h3>
+            <p class="dashboard-method">Disponibilidad = respuestas «Sí» / respuestas válidas «Sí» o «No» del grupo. Composición = ítems disponibles del grupo / todos los ítems disponibles; saludable y no saludable suman 100 % cuando hay oferta. Se cuentan ítems de la pauta, no unidades vendidas, consumo ni calidad de la dieta. «Variedad» no entra en estos porcentajes. Sin respuesta no equivale a «No».</p>
+            <div id="researchAvailability"></div>
+          </section>
+          <section aria-labelledby="researchPricesTitle">
+            <h3 id="researchPricesTitle">Rango de precios de alimentos cotizados</h3>
+            <p class="dashboard-method">CLP por producto y unidad, sin mezclar kg, 0,5 kg y Unidad. Mínimo, máximo, media y mediana de los valores cotizados (incluyen ambos extremos cuando se reportaron). n = valores, no locales; se indica también el número de locales. «Otros» y productos sin precio se excluyen. Productos históricos permanecen separados: no se convierte marraqueta en hallulla ni se suman productos/unidades distintos como un costo total de canasta.</p>
+            <div id="researchPrices"></div>
+          </section>
+          <section aria-labelledby="researchOriginsTitle" hidden>
+            <h3 id="researchOriginsTitle">Origen regional reportado</h3>
+            <p class="dashboard-method">La pauta registra solo productos con evidencia de origen regional: no estima el porcentaje local frente al externo. El porcentaje de locales usa solo pautas con productos regionales o declaración explícita de que no se observaron. Las filas de detalle son productos reportados, no volumen comercializado; el porcentaje usa el total de productos regionales reportados del grupo seleccionado.</p>
+            <p id="researchOriginsSummary" class="list-summary"></p>
+            <div id="researchOrigins"></div>
+          </section>
+        </section>
+
+        <section class="work-area board-area" aria-labelledby="boardTitle">
+          <div class="section-title">
+            <div>
+              <h2 id="boardTitle">Distribución de la cartera</h2>
+              <p>Arrastra tarjetas desde el universo hacia una persona. Si marcas varias, se mueven juntas. Lo que muevas aquí aparece de inmediato en el portal de cada aplicador.</p>
+            </div>
+            <p id="portfolioCount" class="list-summary" aria-live="polite">Cargando cartera…</p>
+          </div>
+
+          <div id="portfolioQuickFilters" class="portfolio-quick-filters" role="group" aria-label="Filtros rápidos por estado de pautas y terreno"></div>
+
+          <div id="portfolioBoard" class="board">
+            <section class="board-column" aria-labelledby="universeTitle">
+              <header class="column-head"><h3 id="universeTitle">Universo de locales</h3><span id="universeCount" class="column-count"></span></header>
+              <div class="board-filters">
+                <input id="portfolioSearch" type="search" placeholder="Código, nombre o dirección" aria-label="Buscar locales" autocomplete="off">
+                <select id="ownerFilter" aria-label="Filtrar por responsable"><option value="">Todas las personas</option></select>
+                <select id="portfolioCategoryFilter" aria-label="Filtrar por tipo de local"><option value="">Todos los tipos</option></select>
+                <select id="portfolioStateFilter" aria-label="Filtrar por estado de pautas o terreno"><option value="">Todos los estados</option></select>
+                <button class="quiet-button" id="selectVisible" type="button">Marcar visibles</button>
+              </div>
+              <div id="universeList" class="board-list" aria-live="polite"></div>
+            </section>
+
+            <section class="board-column people-column" aria-labelledby="peopleTitle">
+              <header class="column-head"><h3 id="peopleTitle">Aplicadores</h3></header>
+              <p class="column-help">Suelta tarjetas sobre una persona. Haz clic para ver su cartera a la derecha.</p>
+              <div id="collectorTargets" class="collector-targets"></div>
+              <div class="selection-bar">
+                <p id="selectionCount" aria-live="polite">Marca locales para moverlos en grupo</p>
+                <select id="bulkCollector" aria-label="Destino de la selección"><option value="">Mover selección a…</option></select>
+                <div class="selection-actions">
+                  <button class="primary-button" id="bulkMoveButton" type="button" disabled>Mover</button>
+                  <button class="quiet-button" id="clearSelection" type="button" disabled>Limpiar</button>
+                </div>
+              </div>
+              <p id="dragHint" class="drag-hint" aria-live="polite"></p>
+            </section>
+
+            <section class="board-column" aria-labelledby="ownerTitle">
+              <header class="column-head"><h3 id="ownerTitle">Locales por persona</h3><span id="ownerCount" class="column-count"></span></header>
+              <div id="ownerList" class="board-list owner-list" aria-live="polite"></div>
+            </section>
+          </div>
+
+          <section id="localDetail" class="local-detail" aria-labelledby="detailTitle" hidden>
+            <div class="detail-head">
+              <div>
+                <h3 id="detailTitle"></h3>
+                <p id="detailMeta" class="assignment-meta"></p>
+                <p id="detailOwner" class="assignment-details"></p>
+                <p id="detailCapture" class="local-history"></p>
+              </div>
+              <div class="detail-actions">
+                <select id="detailOwnerMove" aria-label="Mover este local"><option value="">Mover este local a…</option></select>
+                <button class="quiet-button" id="closeDetail" type="button">Cerrar</button>
+              </div>
+            </div>
+            <fieldset id="detailInstruments" class="instrument-choices detail-instruments"></fieldset>
+            <p class="inline-help">La categoría no define las pautas: marca solo las que corresponden según el protocolo. El estado de la derecha se lee de la planilla de captura.</p>
+            <div class="detail-save">
+              <button class="primary-button" id="saveInstruments" type="button">Guardar pautas de este local</button>
+              <button class="secondary-button" id="applyInstrumentsToSelection" type="button" hidden>Aplicar a la selección</button>
+              <p id="detailMessage" class="inline-help" aria-live="polite"></p>
+            </div>
+            <div class="detail-field-status">
+              <h4>Condición del local en terreno (Cerrado o rechazo)</h4>
+              <p class="inline-help">Si el local se encuentra cerrado o rechaza participar, regístralo aquí para identificarlo en los filtros y en el pulso operativo.</p>
+              <div class="field-status-controls">
+                <label for="detailFieldStatus">Condición en terreno
+                  <select id="detailFieldStatus">
+                    <option value="Operativo">Operativo (disponible para aplicar pautas)</option>
+                    <option value="Cerrado">Cerrado (temporal, definitivo o sin atención)</option>
+                    <option value="Rechazo">Rechazo (locatario/a no desea participar)</option>
+                  </select>
+                </label>
+                <label for="detailFieldNote">Observación o motivo
+                  <input id="detailFieldNote" type="text" maxlength="300" placeholder="Ej.: Cerrado definitivo / dueña indica que no desea responder">
+                </label>
+                <button class="secondary-button" id="saveFieldStatus" type="button">Guardar condición</button>
+              </div>
+              <p id="detailFieldMeta" class="inline-help" aria-live="polite"></p>
+            </div>
+          </section>
+
+          <section id="fieldIncidentsPanel" class="field-incidents-panel" aria-labelledby="fieldIncidentsTitle">
+            <div id="consolidatedSyncBar" class="consolidated-sync-bar" hidden>
+              <div>
+                <strong>Consolidación de locales nuevos y decisiones manuales (corte 19/11)</strong>
+                <p id="consolidatedSyncStatus" class="inline-help"></p>
+              </div>
+              <button class="secondary-button" id="syncConsolidatedButton" type="button">Integrar locales nuevos y decisiones</button>
+            </div>
+            <div class="section-title">
+              <div>
+                <h3 id="fieldIncidentsTitle">Registro y seguimiento de locales cerrados o con rechazo</h3>
+                <p>Ingresa directamente un local cerrado o con rechazo sin buscar su tarjeta, o revisa y reactiva los locales con incidencia reportada.</p>
+              </div>
+              <span id="fieldIncidentsCount" class="column-count"></span>
+            </div>
+            <form id="fieldIncidentForm" class="field-incident-form">
+              <label for="incidentLocal">Local
+                <select id="incidentLocal" required><option value="">Selecciona un local…</option></select>
+              </label>
+              <label for="incidentStatus">Condición
+                <select id="incidentStatus" required>
+                  <option value="Cerrado">Cerrado</option>
+                  <option value="Rechazo">Rechazo</option>
+                  <option value="Operativo">Operativo (reactivar)</option>
+                </select>
+              </label>
+              <label for="incidentNote">Observación o motivo (opcional)
+                <input id="incidentNote" type="text" maxlength="300" placeholder="Ej.: Cerrado definitivamente, cambio de rubro, rechazo en visita…">
+              </label>
+              <button class="primary-button" id="saveIncidentButton" type="submit">Registrar condición</button>
+            </form>
+            <p id="incidentFormMessage" class="form-message" role="status" aria-live="polite" hidden></p>
+            <div id="fieldIncidentsList" class="field-incidents-list" aria-live="polite"></div>
+          </section>
+        </section>
+
+        <section class="planner-bar" aria-label="Fecha de la jornada">
+          <div>
+            <label for="adminDate">Fecha de trabajo</label>
+            <input id="adminDate" type="date">
+          </div>
+          <p>Opcional: programa visitas con fecha. Los aplicadores ya ven su cartera completa aunque no haya jornada programada.</p>
+          <button class="secondary-button" id="refreshAdmin" type="button">Actualizar</button>
+        </section>
+
+        <section class="work-area proposal-area" aria-labelledby="proposalTitle">
+          <div class="section-title">
+            <div><h2 id="proposalTitle">Propuestas por revisar</h2><p id="proposalCount" aria-live="polite">Cargando…</p></div>
+          </div>
+          <div id="adminProposals" class="assignment-list" aria-live="polite"></div>
+        </section>
+
+        <div class="admin-columns">
+          <section class="work-area assignment-editor" aria-labelledby="createTitle">
+            <div class="section-title"><h2 id="createTitle">Programar una visita</h2></div>
+            <form id="assignmentForm" class="assignment-form">
+              <label for="localSearch">Buscar en la muestra
+                <input id="localSearch" type="search" placeholder="Código, nombre o dirección" autocomplete="off">
+              </label>
+              <label for="localCategoryFilter">Tipo de local
+                <select id="localCategoryFilter"><option value="">Todos los tipos</option></select>
+              </label>
+              <label for="localStateFilter">Estado de pautas o terreno
+                <select id="localStateFilter"><option value="">Todos los estados</option></select>
+              </label>
+              <label for="assignmentLocal">Local
+                <select id="assignmentLocal" required><option value="">Cargando locales…</option></select>
+              </label>
+              <label for="assignmentCollector">Aplicador/a
+                <select id="assignmentCollector" required><option value="">Selecciona aplicador/a</option></select>
+              </label>
+              <p id="suggestedPerson" class="inline-help suggested-person">Elige el local y luego a la persona de esta jornada.</p>
+              <div id="locationReview" class="location-review" hidden>
+                <strong>Revisión territorial requerida</strong>
+                <p id="locationReviewText"></p>
+                <label><input id="confirmedLocation" type="checkbox"> Revisé la dirección, ubicación y ruta para esta asignación.</label>
+              </div>
+              <fieldset class="instrument-choices">
+                <legend>Pautas requeridas</legend>
+                <label hidden><input type="checkbox" value="classification"> Clasificación</label>
+                <label><input type="checkbox" value="availability"> Disponibilidad y variedad</label>
+                <label hidden><input type="checkbox" value="origins"> Origen</label>
+                <label><input type="checkbox" value="prices"> Precios</label>
+              </fieldset>
+              <p class="form-message error" role="alert" hidden></p>
+              <button class="primary-button" id="createAssignmentButton" type="submit">Guardar asignación</button>
+            </form>
+          </section>
+
+          <section class="work-area roster-area" aria-labelledby="scheduleTitle">
+            <div class="section-title"><div><h2 id="scheduleTitle">Visitas programadas</h2><p id="assignmentCount">Cargando…</p></div></div>
+            <div id="adminAssignments" class="assignment-list" aria-live="polite"></div>
+          </section>
+        </div>
+
+        <section class="work-area access-area" aria-labelledby="accessTitle">
+          <div class="section-title">
+            <div><h2 id="accessTitle">Acceso del equipo</h2><p>Cada persona ingresa con su correo y clave individual. El primer acceso exige cambiar la clave temporal; la recuperación se envía al correo registrado.</p></div>
+          </div>
+          <dl class="access-facts">
+            <div><dt>Cuentas habilitadas</dt><dd id="accountStatus">Cargando…</dd></div>
+            <div><dt>Enlace para el equipo</dt><dd><a id="collectorUrl" target="_blank" rel="noopener">Cargando…</a></dd></div>
+          </dl>
+          <form id="digestEmailForm" class="digest-email-form">
+            <label for="digestEmail">Correo para resumen diario de terreno
+              <input id="digestEmail" type="email" autocomplete="email" maxlength="254" placeholder="coordinacion@ejemplo.cl">
+            </label>
+            <p class="form-message error" role="alert" hidden></p>
+            <button class="secondary-button" id="saveDigestEmail" type="submit">Guardar correo</button>
+          </form>
+          <p id="digestStatus" class="inline-help" aria-live="polite"></p>
+          <p class="inline-help">El resumen se envía a las 08:00 con visitas aprobadas para hoy y propuestas pendientes. Para activar el envío, guarda un correo y luego ejecuta <code>setupDailyProposalDigest()</code> una vez en el editor Apps Script; acepta el permiso de correo. Sin actividad para informar, no se envía mensaje.</p>
+          <p class="inline-help">Las claves se guardan como hashes con sal; no se almacenan en texto legible ni en el repositorio. La recuperación usa un código de un solo uso, con vencimiento y límite de intentos.</p>
+          <button class="quiet-button" id="revokeAccessButton" type="button">Cerrar sesiones activas del equipo</button>
+        </section>
+      </section>
+
+      <footer><span>ESPORA</span> · Economía Social, Precios, Orgánicos, Residuos y Alimentación</footer>
+    </main>
+    <?!= include('Client'); ?>
+  </body>
+</html>

@@ -1,0 +1,2478 @@
+<script>
+  const $ = (selector, root) => (root || document).querySelector(selector);
+  const PAGE_ROLE = document.body.dataset.portalRole === 'admin' ? 'admin' : 'collector';
+  const INSTRUMENTS = [
+    { id: 'availability', label: 'Disponibilidad y variedad' },
+    { id: 'prices', label: 'Precios' },
+  ];
+  const STATES = ['Pendiente', 'En curso', 'Completo', 'No aplica', 'Bloqueado'];
+  const UNASSIGNED = '__none';
+  const TOKEN_KEY = `esporaNuevoEstudioManagementToken:${PAGE_ROLE}`;
+  let currentSession = null;
+  let collectorNames = [];
+  let localCache = [];
+  let portfolioCache = [];
+  let selectedCodes = new Set();
+  let activeOwner = '';
+  let detailCode = '';
+  let collectorProfile = '';
+  let workspace = null;
+  let selectedLocalCode = '';
+  let researchStatistics = null;
+
+  // ---------- Shared helpers ----------
+  function runServer(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      const runner = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler((error) => reject(new Error(error && error.message ? error.message : 'No se pudo completar la operación.')));
+      runner[functionName](...args);
+    });
+  }
+
+  function setBusy(button, busy, label) {
+    if (!button) return;
+    if (!button.dataset.defaultLabel) button.dataset.defaultLabel = button.textContent;
+    button.disabled = busy;
+    button.textContent = busy ? label : button.dataset.defaultLabel;
+  }
+
+  function showLoginError(message) {
+    const error = $('#loginError');
+    error.textContent = message;
+    error.classList.remove('success');
+    error.classList.add('error');
+    error.hidden = !message;
+  }
+
+  function showLoginSuccess(message) {
+    const status = $('#loginError');
+    status.textContent = message;
+    status.classList.remove('error');
+    status.classList.add('success');
+    status.hidden = !message;
+  }
+
+  function passwordChecks(password) {
+    const value = String(password || '');
+    return {
+      length: Array.from(value).length >= 12,
+      letter: /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(value),
+      number: /\d/.test(value),
+      special: /[^A-Za-zÀ-ÖØ-öø-ÿ0-9\s]/.test(value),
+    };
+  }
+
+  function updatePasswordRules(password, list) {
+    if (!list) return;
+    const checks = passwordChecks(password);
+    const labels = {
+      length: 'Al menos 12 caracteres',
+      letter: 'Incluye una letra',
+      number: 'Incluye un número',
+      special: 'Incluye un carácter especial',
+    };
+    Object.keys(checks).forEach((rule) => {
+      const item = $(`[data-rule="${rule}"]`, list);
+      if (item) {
+        item.classList.toggle('is-valid', checks[rule]);
+        item.textContent = `${labels[rule]}${checks[rule] ? ' — listo' : ''}`;
+      }
+    });
+  }
+
+  function personalPasswordIsValid(password) {
+    return Object.values(passwordChecks(password)).every(Boolean);
+  }
+
+  function openPasswordReset() {
+    const loginEmail = $('#loginEmail');
+    const resetEmail = $('#resetEmail');
+    resetEmail.value = loginEmail ? loginEmail.value.trim() : '';
+    $('#loginView').hidden = true;
+    $('#passwordChangeView').hidden = true;
+    $('#resetView').hidden = false;
+    $('#resetRequestMessage').hidden = true;
+    $('#resetError').hidden = true;
+    resetEmail.focus();
+  }
+
+  function returnToLogin() {
+    $('#resetView').hidden = true;
+    $('#passwordChangeView').hidden = true;
+    $('#loginView').hidden = false;
+    $('#loginEmail').focus();
+  }
+
+  function submitPasswordChange(event) {
+    event.preventDefault();
+    const password = $('#changePassword').value;
+    const confirmation = $('#changePasswordConfirm').value;
+    const error = $('#passwordChangeError');
+    if (!personalPasswordIsValid(password)) {
+      error.textContent = 'La clave debe cumplir los cuatro requisitos indicados.';
+      error.hidden = false;
+      return;
+    }
+    if (password !== confirmation) {
+      error.textContent = 'Las claves no coinciden. Vuelve a escribirlas.';
+      error.hidden = false;
+      $('#changePasswordConfirm').focus();
+      return;
+    }
+    error.hidden = true;
+    const button = $('#changePasswordButton');
+    setBusy(button, true, 'Guardando…');
+    runServer('apiChangePassword', currentSession.token, password, confirmation)
+      .then(() => {
+        const session = Object.assign({}, currentSession, { mustChange: false });
+        $('#passwordChangeForm').reset();
+        persistSession(session);
+        enterPortal(session);
+      })
+      .catch((failure) => {
+        if (!handleSessionError(failure)) {
+          error.textContent = failure.message;
+          error.hidden = false;
+        }
+      })
+      .finally(() => setBusy(button, false));
+  }
+
+  function requestPasswordReset(event) {
+    event.preventDefault();
+    const button = $('#resetRequestButton');
+    const message = $('#resetRequestMessage');
+    message.hidden = true;
+    setBusy(button, true, 'Enviando…');
+    runServer('apiRequestPasswordReset', $('#resetEmail').value)
+      .then((result) => {
+        message.textContent = result.message;
+        message.classList.remove('error');
+        message.hidden = false;
+      })
+      .catch((failure) => {
+        message.textContent = failure.message;
+        message.classList.add('error');
+        message.hidden = false;
+      })
+      .finally(() => setBusy(button, false));
+  }
+
+  function completePasswordReset(event) {
+    event.preventDefault();
+    const password = $('#resetPassword').value;
+    const confirmation = $('#resetPasswordConfirm').value;
+    const error = $('#resetError');
+    if (!personalPasswordIsValid(password)) {
+      error.textContent = 'La clave debe cumplir los cuatro requisitos indicados.';
+      error.hidden = false;
+      return;
+    }
+    if (password !== confirmation) {
+      error.textContent = 'Las claves no coinciden. Vuelve a escribirlas.';
+      error.hidden = false;
+      $('#resetPasswordConfirm').focus();
+      return;
+    }
+    error.hidden = true;
+    const button = $('#resetCompleteButton');
+    setBusy(button, true, 'Actualizando…');
+    runServer('apiCompletePasswordReset', $('#resetEmail').value, $('#resetCode').value, password, confirmation)
+      .then((result) => {
+        $('#resetCompleteForm').reset();
+        $('#resetRequestForm').reset();
+        $('#resetView').hidden = true;
+        $('#loginView').hidden = false;
+        showLoginSuccess(result.message);
+        $('#loginEmail').focus();
+      })
+      .catch((failure) => {
+        error.textContent = failure.message;
+        error.hidden = false;
+      })
+      .finally(() => setBusy(button, false));
+  }
+
+  function togglePasswordVisibility(event) {
+    const button = event.currentTarget;
+    const input = document.getElementById(button.dataset.togglePassword);
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    button.textContent = show ? 'Ocultar' : 'Mostrar';
+    button.setAttribute('aria-label', `${show ? 'Ocultar' : 'Mostrar'} ${button.dataset.togglePassword === 'credential' ? 'clave' : 'contraseña'}`);
+    input.focus();
+  }
+
+  function showPortalAlert(message, isError) {
+    const alert = $('#portalAlert');
+    if (!alert) return;
+    alert.textContent = message;
+    alert.classList.toggle('error-notice', Boolean(isError));
+    alert.setAttribute('role', isError ? 'alert' : 'status');
+    alert.hidden = !message;
+  }
+
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function addEmptyState(container, message) {
+    container.replaceChildren(element('div', 'empty-state', message));
+  }
+
+  function showLoadingList(container) {
+    const loading = element('div', 'loading-list');
+    loading.setAttribute('aria-label', 'Cargando');
+    loading.setAttribute('role', 'status');
+    loading.append(element('div', 'loading-row'), element('div', 'loading-row'));
+    container.replaceChildren(loading);
+  }
+
+  function localToday() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  }
+
+  function setDefaultDates() {
+    ['#adminDate', '#collectorDate'].forEach((selector) => {
+      const input = $(selector);
+      if (input && !input.value) input.value = localToday();
+    });
+  }
+
+  function stateClass(status) {
+    return ({
+      'En curso': 'state-progress',
+      'Completo': 'state-complete',
+      'Con registro en captura': 'state-complete',
+      'Bloqueado': 'state-blocked',
+      'No aplica': 'state-noapply',
+      'No requerido': 'state-muted',
+      'Sin lectura de captura': 'state-muted',
+    })[status] || 'state-pending';
+  }
+
+  function captureSummary(item) {
+    const capture = item && item.capture;
+    if (!capture) return '';
+    if (!capture.requiredCount) return 'Sin pautas definidas';
+    if (capture.recordedCount === 0) return `Sin pautas aplicadas (0 de ${capture.requiredCount})`;
+    if (capture.recordedCount < capture.requiredCount) {
+      return `Con pautas pendientes (${capture.recordedCount} de ${capture.requiredCount})`;
+    }
+    return `Pautas completas (${capture.recordedCount} de ${capture.requiredCount})`;
+  }
+
+  function localFieldStatus(item) {
+    const value = String((item && item.fieldStatus) || '').trim();
+    return value === 'Cerrado' || value === 'Rechazo' ? value : 'Operativo';
+  }
+
+  function pendingInstrumentLabels(item) {
+    const capture = item && item.capture;
+    const required = Array.isArray(item && item.requiredInstruments) ? item.requiredInstruments : [];
+    return INSTRUMENTS
+      .filter((instrument) => required.includes(instrument.id) && !(capture && capture.instruments && capture.instruments[instrument.id] && capture.instruments[instrument.id].rows > 0))
+      .map((instrument) => instrument.label);
+  }
+
+  function evidenceBadgeClass(item) {
+    const capture = item && item.capture;
+    if (!capture || !capture.requiredCount) return 'evidence';
+    if (capture.recordedCount === 0) return 'evidence is-unstarted';
+    if (capture.recordedCount < capture.requiredCount) return 'evidence is-partial';
+    return 'evidence is-recorded';
+  }
+
+  function matchesLocalStateFilter(item, filterValue) {
+    if (!filterValue) return true;
+    const status = localFieldStatus(item);
+    const isClosed = status === 'Cerrado';
+    const isRejected = status === 'Rechazo';
+    const isOperative = !isClosed && !isRejected;
+    const requiredCount = item && item.capture
+      ? item.capture.requiredCount
+      : (Array.isArray(item && item.requiredInstruments) ? item.requiredInstruments.length : 0);
+    const recordedCount = item && item.capture ? item.capture.recordedCount : 0;
+    switch (filterValue) {
+      case 'no_applied':
+        return isOperative && recordedCount === 0;
+      case 'pending_any':
+        return isOperative && requiredCount > 0 && recordedCount < requiredCount;
+      case 'pending_partial':
+        return isOperative && requiredCount > 0 && recordedCount > 0 && recordedCount < requiredCount;
+      case 'complete':
+        return isOperative && requiredCount > 0 && recordedCount >= requiredCount;
+      case 'closed_or_rejected':
+        return isClosed || isRejected;
+      case 'closed':
+        return isClosed;
+      case 'rejected':
+        return isRejected;
+      case 'operative':
+        return isOperative;
+      default:
+        return true;
+    }
+  }
+
+  function computeStateCounts(items) {
+    const list = Array.isArray(items) ? items : [];
+    const counts = {
+      total: list.length,
+      no_applied: 0,
+      pending_any: 0,
+      pending_partial: 0,
+      complete: 0,
+      closed_or_rejected: 0,
+      closed: 0,
+      rejected: 0,
+      operative: 0,
+    };
+    list.forEach((item) => {
+      ['no_applied', 'pending_any', 'pending_partial', 'complete', 'closed_or_rejected', 'closed', 'rejected', 'operative']
+        .forEach((key) => {
+          if (matchesLocalStateFilter(item, key)) counts[key] += 1;
+        });
+    });
+    return counts;
+  }
+
+  function buildStateFilterOptions(items, allLabel) {
+    const counts = computeStateCounts(items);
+    return [
+      new Option(`${allLabel || 'Todos los estados'} (${counts.total})`, ''),
+      new Option(`Sin pautas aplicadas · 0 registradas (${counts.no_applied})`, 'no_applied'),
+      new Option(`Con pautas pendientes · todos (${counts.pending_any})`, 'pending_any'),
+      new Option(`Con pautas pendientes · avance parcial (${counts.pending_partial})`, 'pending_partial'),
+      new Option(`Pautas completas (${counts.complete})`, 'complete'),
+      new Option(`Cerrado o rechazo (${counts.closed_or_rejected})`, 'closed_or_rejected'),
+      new Option(`Solo local cerrado (${counts.closed})`, 'closed'),
+      new Option(`Solo rechazo (${counts.rejected})`, 'rejected'),
+      new Option(`Solo locales operativos (${counts.operative})`, 'operative'),
+    ];
+  }
+
+  // ---------- Session ----------
+  function persistSession(session) {
+    currentSession = session;
+    localStorage.setItem(TOKEN_KEY, JSON.stringify(session));
+  }
+
+  function clearSessionState(message) {
+    currentSession = null;
+    workspace = null;
+    collectorProfile = '';
+    localStorage.removeItem(TOKEN_KEY);
+    $('#sessionBadge').hidden = true;
+    $('#portalView').hidden = true;
+    $('#passwordChangeView').hidden = true;
+    $('#resetView').hidden = true;
+    $('#loginView').hidden = false;
+    showPortalAlert('', false);
+    showLoginError(message || '');
+  }
+
+  function handleSessionError(error) {
+    if (/expiró o fue revocada/i.test(error.message)) {
+      clearSessionState(error.message);
+      return true;
+    }
+    return false;
+  }
+
+  function logout() {
+    const token = currentSession && currentSession.token;
+    if (!token) {
+      clearSessionState();
+      return;
+    }
+    const buttons = [...document.querySelectorAll('.logout-button')];
+    buttons.forEach((button) => setBusy(button, true, 'Cerrando…'));
+    runServer('apiLogout', token)
+      .then(() => clearSessionState())
+      .catch((error) => showPortalAlert(`No se pudo cerrar la sesión en el servidor: ${error.message}`, true))
+      .finally(() => buttons.forEach((button) => setBusy(button, false)));
+  }
+
+  function enterPortal(session) {
+    persistSession(session);
+    $('#resetView').hidden = true;
+    if (session.mustChange) {
+      $('#loginView').hidden = true;
+      $('#portalView').hidden = true;
+      $('#passwordChangeView').hidden = false;
+      $('#passwordChangeForm').reset();
+      $('#passwordChangeError').hidden = true;
+      updatePasswordRules('', $('#passwordRules'));
+      return;
+    }
+    $('#passwordChangeView').hidden = true;
+    $('#loginView').hidden = true;
+    setDefaultDates();
+    if (PAGE_ROLE === 'admin') {
+      if (session.role !== 'admin') {
+        clearSessionState('Esta sesión no corresponde a administración.');
+        return;
+      }
+      $('#sessionBadge').hidden = false;
+      $('#sessionBadge').textContent = `${session.name} · Administración`;
+      $('#portalView').hidden = false;
+      loadAdminData();
+      return;
+    }
+    if (session.role !== 'collector') {
+      clearSessionState('Esta sesión no corresponde al equipo de terreno.');
+      return;
+    }
+    collectorProfile = session.name;
+    $('#sessionBadge').hidden = false;
+    $('#sessionBadge').textContent = collectorProfile;
+    $('#collectorHeading').textContent = `Hola, ${collectorProfile.split(' ')[0]}`;
+    $('#portalView').hidden = false;
+    loadWorkspace();
+  }
+
+  // ---------- Admin: data ----------
+  function loadAdminData(successMessage) {
+    if (!currentSession || PAGE_ROLE !== 'admin') return Promise.resolve();
+    const assignments = $('#adminAssignments');
+    showLoadingList(assignments);
+    if (!portfolioCache.length) showLoadingList($('#universeList'));
+    $('#researchType').disabled = true;
+    $('#refreshResearch').disabled = true;
+    $('#refreshResearch').onclick = () => loadAdminData();
+    $('#researchStatus').hidden = false;
+    $('#researchStatus').textContent = 'Actualizando resultados…';
+    return runServer('apiGetAdminData', currentSession.token, $('#adminDate').value)
+      .then((data) => {
+        if (!data || !Array.isArray(data.locals) || !Array.isArray(data.portfolio) || !Array.isArray(data.assignments)) {
+          throw new Error('El servidor devolvió datos incompletos. Comprueba que Code.gs y las plantillas sean de la misma versión.');
+        }
+        if (!data.operations || !data.operations.overdueAssignments || !Array.isArray(data.proposals)) {
+          throw new Error('Falta el resumen operativo o las propuestas. Actualiza Code.gs y las plantillas del portal a la misma versión.');
+        }
+        collectorNames = data.collectors.slice();
+        localCache = data.locals;
+        portfolioCache = data.portfolio;
+        selectedCodes = new Set([...selectedCodes].filter((code) => portfolioCache.some((item) => item.code === code)));
+        populateAdminControls();
+        renderBoard();
+        renderOperationalDashboard(data);
+        renderConsolidatedSyncStatus(Boolean(data.operations.consolidatedDecisionsSynced));
+        renderResearchStatistics(data.capture);
+        renderAdminAssignments(data.assignments);
+        renderAdminProposals(data.proposals);
+        renderAccess(data.access);
+        if (data.capture && !data.capture.available) {
+          showPortalAlert(`La cartera se cargó, pero sin estado de captura: ${data.capture.message}`, true);
+        } else {
+          showPortalAlert(typeof successMessage === 'string' ? successMessage : '', false);
+        }
+      })
+      .catch((error) => {
+        if (handleSessionError(error)) return;
+        researchStatistics = null;
+        renderResearchStatistics({ available: false, message: error.message });
+        addEmptyState(assignments, 'No fue posible cargar las asignaciones. Comprueba la conexión y vuelve a intentar.');
+        showPortalAlert(error.message, true);
+      })
+      .finally(() => { $('#refreshResearch').disabled = false; });
+  }
+
+  function researchRatio(numerator, denominator) {
+    if (!denominator) return '— (sin base)';
+    return `${(100 * numerator / denominator).toLocaleString('es-CL', { maximumFractionDigits: 1 })} % (${numerator}/${denominator})`;
+  }
+
+  function researchTable(root, caption, headers, rows, emptyMessage) {
+    root.replaceChildren();
+    if (!rows.length) {
+      addEmptyState(root, emptyMessage || 'Sin respuestas válidas para este grupo.');
+      return;
+    }
+    const table = element('table', 'dashboard-table');
+    table.append(element('caption', '', caption));
+    const head = document.createElement('thead');
+    const header = document.createElement('tr');
+    headers.forEach((label) => {
+      const cell = element('th', '', label);
+      cell.scope = 'col';
+      header.append(cell);
+    });
+    head.append(header);
+    const body = document.createElement('tbody');
+    rows.forEach((values) => {
+      const row = document.createElement('tr');
+      values.forEach((value, index) => {
+        const cell = element(index ? 'td' : 'th', '', String(value));
+        if (!index) cell.scope = 'row';
+        row.append(cell);
+      });
+      body.append(row);
+    });
+    table.append(head, body);
+    const scroll = element('div', 'dashboard-table-scroll');
+    scroll.tabIndex = 0;
+    scroll.setAttribute('role', 'region');
+    scroll.setAttribute('aria-label', caption);
+    scroll.append(table);
+    root.append(scroll);
+  }
+
+  function renderResearchStatistics(capture) {
+    const selector = $('#researchType');
+    const previous = selector.value;
+    researchStatistics = capture?.available ? capture.statistics : null;
+    const status = $('#researchStatus');
+    if (!researchStatistics) {
+      status.hidden = false;
+      status.textContent = capture?.available
+        ? 'Resultados no disponibles. Actualiza Code.gs y las plantillas del portal a la misma versión.'
+        : `Resultados no disponibles: ${capture?.message || 'sin lectura de la captura.'}`;
+      selector.disabled = true;
+      selector.replaceChildren(element('option', '', 'Sin resultados disponibles'));
+      ['researchClassification', 'researchAvailability', 'researchPrices', 'researchOrigins'].forEach((id) =>
+        addEmptyState($(`#${id}`), 'Sin resultados disponibles.'));
+      $('#researchSample').textContent = '';
+      $('#researchOriginsSummary').textContent = '';
+      return;
+    }
+    status.hidden = !researchStatistics.warnings.length;
+    status.textContent = researchStatistics.warnings.join(' ');
+    const classification = researchStatistics.classification;
+    if (researchStatistics.available.classification) {
+      researchTable($('#researchClassification'), 'Clasificación final · locales con visita',
+        ['Resultado', 'Locales', '% de locales'],
+        classification.total ? Object.entries(classification.counts).map(([label, count]) =>
+          [label, count, researchRatio(count, classification.total)]) : []);
+    } else {
+      addEmptyState($('#researchClassification'), 'Clasificación no disponible: faltan la hoja o sus encabezados.');
+    }
+    selector.replaceChildren(...researchStatistics.groups.map((group) => {
+      const option = element('option', '', group.label);
+      option.value = group.label;
+      return option;
+    }));
+    selector.disabled = !researchStatistics.groups.length;
+    if (researchStatistics.groups.some((group) => group.label === previous)) selector.value = previous;
+    selector.onchange = renderResearchGroup;
+    renderResearchGroup();
+  }
+
+  function renderResearchGroup() {
+    const group = researchStatistics?.groups.find((entry) => entry.label === $('#researchType').value);
+    $('#researchSample').textContent = group
+      ? `${group.locals} ${group.locals === 1 ? 'local' : 'locales'} con visita · ${group.availabilityLocals} con pauta de disponibilidad`
+      : 'Sin locales con visitas registradas.';
+    $('#researchOriginsSummary').textContent = '';
+    const available = researchStatistics?.available || {};
+    if (!group || !available.availability) {
+      addEmptyState($('#researchAvailability'), group ? 'Disponibilidad no disponible: faltan la hoja o sus encabezados.' : 'Sin respuestas registradas.');
+    } else {
+      const totalYes = group.healthy.yes + group.unhealthy.yes;
+      researchTable($('#researchAvailability'), `Disponibilidad · ${group.label}`,
+        ['Grupo de ítems', 'Disponibles', 'Respuestas válidas', '% disponibilidad', '% composición'],
+        [['Saludables', group.healthy], ['No saludables', group.unhealthy]].map(([label, stats]) =>
+          [label, stats.yes, stats.valid, researchRatio(stats.yes, stats.valid), researchRatio(stats.yes, totalYes)]));
+    }
+    if (!group || !available.prices) {
+      addEmptyState($('#researchPrices'), group ? 'Precios no disponibles: faltan la hoja o sus encabezados.' : 'Sin respuestas registradas.');
+    } else {
+      const money = (value) => value.toLocaleString('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+      researchTable($('#researchPrices'), `Precios en CLP · ${group.label}`,
+        ['Producto', 'Unidad', 'Locales', 'n valores', 'Mínimo', 'Máximo', 'Media', 'Mediana'],
+        group.prices.map((item) => [item.product, item.unit, item.locals, item.samples,
+          money(item.min), money(item.max), money(item.mean), money(item.median)]),
+        'Sin precios válidos en unidades comparables para este grupo.');
+    }
+    if (!group || !available.origins) {
+      addEmptyState($('#researchOrigins'), group ? 'Origen no disponible: faltan la hoja o sus encabezados.' : 'Sin respuestas registradas.');
+    } else {
+      $('#researchOriginsSummary').textContent =
+        `Con productos regionales: ${researchRatio(group.regionalLocals, group.originLocals)} · Sin productos regionales observados: ${researchRatio(group.noneLocals, group.originLocals)} · Sin declaración válida: ${group.locals - group.originLocals} locales.`;
+      researchTable($('#researchOrigins'), `Origen regional reportado · ${group.label}`,
+        ['Categoría', 'Comuna reportada', 'Evidencia', 'Productos', 'Locales', '% de productos'],
+        group.origins.map((item) => [item.category, item.commune, item.source, item.count, item.locals,
+          researchRatio(item.count, group.originItems)]), 'Sin productos regionales reportados para este grupo.');
+    }
+  }
+
+  function renderOperationalDashboard(data) {
+    const metrics = $('#dashboardMetrics');
+    const overdue = data.operations.overdueAssignments;
+    const assigned = portfolioCache.filter((item) => item.collector);
+    const unassignedCount = portfolioCache.length - assigned.length;
+    const captureAvailable = Boolean(data.capture && data.capture.available);
+    const closedCount = portfolioCache.filter((item) => localFieldStatus(item) === 'Cerrado').length;
+    const rejectedCount = portfolioCache.filter((item) => localFieldStatus(item) === 'Rechazo').length;
+    const incidentCount = closedCount + rejectedCount;
+    const operativePortfolio = portfolioCache.filter((item) => localFieldStatus(item) === 'Operativo');
+    const required = operativePortfolio.flatMap((item) => INSTRUMENTS
+      .filter((instrument) => item.requiredInstruments.includes(instrument.id))
+      .map((instrument) => ({ item, instrument })));
+    const recorded = captureAvailable
+      ? required.filter(({ item, instrument }) => item.capture?.instruments?.[instrument.id]?.rows > 0).length
+      : null;
+    const missing = recorded === null ? null : required.length - recorded;
+    const withVisits = captureAvailable ? assigned.filter((item) => item.capture?.visits > 0).length : null;
+    const noAppliedLocals = captureAvailable
+      ? operativePortfolio.filter((item) => (item.capture?.recordedCount || 0) === 0).length
+      : null;
+    const pendingLocals = captureAvailable
+      ? operativePortfolio.filter((item) => item.capture?.requiredCount > 0 && item.capture.recordedCount < item.capture.requiredCount).length
+      : null;
+    const complete = captureAvailable
+      ? operativePortfolio.filter((item) => item.capture?.requiredCount > 0 && item.capture.recordedCount >= item.capture.requiredCount).length
+      : null;
+    const partial = captureAvailable
+      ? operativePortfolio.filter((item) => item.capture?.recordedCount > 0 && item.capture.recordedCount < item.capture.requiredCount).length
+      : null;
+
+    $('#dashboardAsOf').textContent = `Corte de programaciones: ${overdue.asOf || '—'}`;
+    const notice = $('#dashboardNotice');
+    notice.hidden = captureAvailable;
+    notice.textContent = captureAvailable
+      ? ''
+      : `El resumen de avance no está disponible porque no se pudo leer la planilla de captura. ${data.capture?.message || ''}`;
+    metrics.replaceChildren(
+      dashboardMetric('Locales en cartera', portfolioCache.length, `${assigned.length} con responsable · ${unassignedCount} sin asignar`),
+      dashboardMetric('Sin pautas aplicadas', noAppliedLocals === null ? '—' : noAppliedLocals, noAppliedLocals === null ? 'Sin lectura de captura' : 'Locales operativos con 0 pautas', noAppliedLocals ? 'metric-attention' : ''),
+      dashboardMetric('Con pautas pendientes', pendingLocals === null ? '—' : pendingLocals, pendingLocals === null ? 'Sin lectura de captura' : `${partial || 0} en avance parcial · ${missing} pautas faltantes`, pendingLocals ? 'metric-attention' : ''),
+      dashboardMetric('Cerrados o rechazo', incidentCount, `${closedCount} cerrados · ${rejectedCount} con rechazo`, incidentCount ? 'metric-attention' : ''),
+      dashboardMetric('Programaciones pasadas', overdue.count, 'Con pautas todavía pendientes', overdue.count ? 'metric-attention' : '')
+    );
+
+    renderInstrumentCoverage(captureAvailable);
+    renderCollectorProgress(captureAvailable, withVisits, complete, partial);
+    renderDashboardSuggestions({
+      captureAvailable,
+      unassignedCount,
+      missing,
+      noVisitCount: noAppliedLocals,
+      partialCount: partial,
+      incidentCount,
+      closedCount,
+      rejectedCount,
+      overdueCount: overdue.count,
+      required,
+    });
+    renderOverdueAssignments(overdue);
+    renderDashboardTiming(data.capture?.timing, captureAvailable, data.capture?.message || '');
+  }
+
+  function formatDashboardDuration(seconds) {
+    if (seconds == null || seconds === '' || !Number.isFinite(Number(seconds)) || Number(seconds) < 0) return '—';
+    const total = Math.round(Number(seconds));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const remainingSeconds = total % 60;
+    if (hours) return `${hours} h ${minutes} min`;
+    if (minutes) return `${minutes} min ${remainingSeconds} s`;
+    return `${remainingSeconds} s`;
+  }
+
+  function renderDashboardTiming(timing, captureAvailable, captureMessage) {
+    const averages = $('#dashboardInstrumentTimes');
+    const visitAverage = $('#dashboardVisitTimeAverage');
+    const recent = $('#dashboardRecentVisitTimes');
+    if (!captureAvailable) {
+      addEmptyState(averages, `Tiempos no disponibles: ${captureMessage || 'no se pudo leer la planilla de captura.'}`);
+      addEmptyState(visitAverage, 'Promedio total no disponible.');
+      addEmptyState(recent, 'Visitas con tiempo no disponibles.');
+      return;
+    }
+    if (!timing?.available) {
+      const message = 'La hoja Visitas aún no tiene las columnas de tiempo. Actualice y despliegue el Apps Script de captura; se agregarán al guardar una pauta.';
+      addEmptyState(averages, message);
+      addEmptyState(visitAverage, message);
+      addEmptyState(recent, message);
+      return;
+    }
+
+    const instrumentLabels = {
+      availability: 'Disponibilidad y variedad',
+      prices: 'Precios',
+    };
+    const table = document.createElement('table');
+    table.className = 'dashboard-table';
+    const head = document.createElement('thead');
+    const header = document.createElement('tr');
+    ['Instrumento', 'Promedio', 'Muestras'].forEach((label) => header.append(element('th', '', label)));
+    head.append(header);
+    const body = document.createElement('tbody');
+    Object.entries(instrumentLabels).forEach(([id, label]) => {
+      const value = timing.instrumentAverages?.[id] || {};
+      const row = document.createElement('tr');
+      [label, formatDashboardDuration(value.averageSeconds), String(value.samples || 0)]
+        .forEach((cell) => row.append(element('td', '', cell)));
+      body.append(row);
+    });
+    table.append(head, body);
+    averages.replaceChildren(table);
+
+    visitAverage.replaceChildren();
+    if (timing.visitSamples) {
+      visitAverage.append(
+        element('strong', '', formatDashboardDuration(timing.visitAverageSeconds)),
+        element('span', '', `Promedio total por visita · ${timing.visitSamples} visitas con medición`)
+      );
+    } else {
+      addEmptyState(visitAverage, 'Todavía no hay pautas guardadas con tiempo medido.');
+    }
+
+    if (!timing.recentVisits?.length) {
+      addEmptyState(recent, 'Las visitas con medición aparecerán aquí al guardar pautas.');
+      return;
+    }
+    const recentTable = document.createElement('table');
+    recentTable.className = 'dashboard-table timing-table';
+    const recentHead = document.createElement('thead');
+    const recentHeader = document.createElement('tr');
+    ['Fecha', 'Local', 'Aplicador/a', 'Disponibilidad y variedad', 'Precios', 'Total visita']
+      .forEach((label) => recentHeader.append(element('th', '', label)));
+    recentHead.append(recentHeader);
+    const recentBody = document.createElement('tbody');
+    timing.recentVisits.forEach((visit) => {
+      const row = document.createElement('tr');
+      const local = visit.localName ? `${visit.localCode} · ${visit.localName}` : visit.localCode;
+      [
+        visit.observationDate || '—',
+        local,
+        visit.collector || '—',
+        formatDashboardDuration(visit.durations?.availability),
+        formatDashboardDuration(visit.durations?.prices),
+        formatDashboardDuration(visit.totalDurationSeconds),
+      ].forEach((value) => row.append(element('td', '', String(value))));
+      recentBody.append(row);
+    });
+    recentTable.append(recentHead, recentBody);
+    const scroll = element('div', 'dashboard-table-scroll');
+    scroll.append(recentTable);
+    recent.replaceChildren(scroll);
+  }
+
+  function dashboardMetric(label, value, detail, className) {
+    const card = element('article', `dashboard-metric${className ? ` ${className}` : ''}`);
+    card.append(element('span', 'dashboard-metric-label', label));
+    card.append(element('strong', 'dashboard-metric-value', String(value)));
+    card.append(element('span', 'dashboard-metric-detail', detail));
+    return card;
+  }
+
+  function renderInstrumentCoverage(captureAvailable) {
+    const root = $('#dashboardInstrumentCoverage');
+    if (!captureAvailable) {
+      addEmptyState(root, 'Cobertura no disponible hasta recuperar la lectura de captura.');
+      return;
+    }
+    const rows = INSTRUMENTS.map((instrument) => {
+      const requiredItems = portfolioCache.filter((item) => item.requiredInstruments.includes(instrument.id));
+      const done = requiredItems.filter((item) => item.capture?.instruments?.[instrument.id]?.rows > 0).length;
+      const row = element('div', 'coverage-row');
+      const heading = element('div', 'coverage-heading');
+      heading.append(element('strong', '', instrument.label));
+      heading.append(element('span', '', requiredItems.length ? `${done} de ${requiredItems.length} locales` : 'Sin pauta requerida'));
+      row.append(heading);
+      if (requiredItems.length) {
+        const bar = element('div', 'coverage-track');
+        bar.setAttribute('role', 'img');
+        bar.setAttribute('aria-label', `${instrument.label}: ${done} de ${requiredItems.length} locales con registro`);
+        const fill = element('span', 'coverage-fill');
+        fill.style.width = `${Math.round(done / requiredItems.length * 100)}%`;
+        bar.append(fill);
+        row.append(bar);
+      }
+      return row;
+    });
+    root.replaceChildren(...rows);
+  }
+
+  function renderCollectorProgress(captureAvailable, withVisits, complete, partial) {
+    const root = $('#dashboardCollectorProgress');
+    const people = [...collectorNames, UNASSIGNED];
+    const table = document.createElement('table');
+    table.className = 'dashboard-table';
+    const head = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['Responsable', 'Locales', 'Sin pautas', 'Parciales', 'Con pendientes', 'Completos', 'Cerrado/Rechazo', 'Pautas sin registro']
+      .forEach((label) => headerRow.append(element('th', '', label)));
+    head.append(headerRow);
+    const body = document.createElement('tbody');
+    people.forEach((person) => {
+      const rows = portfolioCache.filter((item) => ownerKey(item) === person);
+      const operativeRows = rows.filter((item) => localFieldStatus(item) === 'Operativo');
+      const incidents = rows.length - operativeRows.length;
+      const noApplied = captureAvailable
+        ? operativeRows.filter((item) => (item.capture?.recordedCount || 0) === 0).length
+        : null;
+      const partialRows = captureAvailable
+        ? operativeRows.filter((item) => item.capture?.recordedCount > 0 && item.capture.recordedCount < item.capture.requiredCount).length
+        : null;
+      const withPending = captureAvailable
+        ? operativeRows.filter((item) => item.capture?.requiredCount > 0 && item.capture.recordedCount < item.capture.requiredCount).length
+        : null;
+      const completed = captureAvailable
+        ? operativeRows.filter((item) => item.capture?.requiredCount > 0 && item.capture.recordedCount >= item.capture.requiredCount).length
+        : null;
+      const pendingPautas = captureAvailable
+        ? operativeRows.reduce((total, item) => total + Math.max(0, (item.capture?.requiredCount || 0) - (item.capture?.recordedCount || 0)), 0)
+        : null;
+      const row = document.createElement('tr');
+      [
+        person === UNASSIGNED ? 'Sin asignar' : person,
+        rows.length,
+        noApplied === null ? '—' : noApplied,
+        partialRows === null ? '—' : partialRows,
+        withPending === null ? '—' : withPending,
+        completed === null ? '—' : completed,
+        incidents,
+        pendingPautas === null ? '—' : pendingPautas,
+      ].forEach((value) => row.append(element('td', '', String(value))));
+      body.append(row);
+    });
+    const operativeAll = portfolioCache.filter((item) => localFieldStatus(item) === 'Operativo');
+    const totalNoApplied = captureAvailable
+      ? operativeAll.filter((item) => (item.capture?.recordedCount || 0) === 0).length
+      : null;
+    const totalWithPending = captureAvailable
+      ? operativeAll.filter((item) => item.capture?.requiredCount > 0 && item.capture.recordedCount < item.capture.requiredCount).length
+      : null;
+    const totalIncidents = portfolioCache.length - operativeAll.length;
+    const totalRow = document.createElement('tr');
+    totalRow.className = 'dashboard-total-row';
+    [
+      'Total',
+      portfolioCache.length,
+      totalNoApplied === null ? '—' : totalNoApplied,
+      captureAvailable ? partial : '—',
+      totalWithPending === null ? '—' : totalWithPending,
+      complete === null ? '—' : complete,
+      totalIncidents,
+      captureAvailable ? operativeAll.reduce((total, item) => total + Math.max(0, (item.capture?.requiredCount || 0) - (item.capture?.recordedCount || 0)), 0) : '—',
+    ].forEach((value) => totalRow.append(element('td', '', String(value))));
+    body.append(totalRow);
+    table.append(head, body);
+    root.replaceChildren(table);
+  }
+
+  function renderDashboardSuggestions(summary) {
+    const list = $('#dashboardSuggestions');
+    const suggestions = [];
+    if (summary.unassignedCount) {
+      suggestions.push(`${summary.unassignedCount} locales siguen sin responsable. Revise la distribución antes de programar nuevas salidas.`);
+    }
+    if (summary.incidentCount) {
+      suggestions.push(`${summary.incidentCount} ${summary.incidentCount === 1 ? 'local figura' : 'locales figuran'} con incidencia en terreno (${summary.closedCount} cerrados y ${summary.rejectedCount} con rechazo). Revise el listado en «Distribución de la cartera» para confirmar o reasignar.`);
+    }
+    if (!summary.captureAvailable) {
+      suggestions.push('El avance de captura no se puede evaluar en esta actualización; verifique permisos y disponibilidad de la planilla de respuestas.');
+    } else {
+      if (summary.noVisitCount) {
+        suggestions.push(`${summary.noVisitCount} locales operativos aún no tienen pautas aplicadas (0 registradas). Use el filtro «Sin pautas aplicadas» para priorizar su salida.`);
+      }
+      if (summary.partialCount) {
+        suggestions.push(`${summary.partialCount} locales ya iniciados tienen pautas pendientes por completar. Use el filtro «Con pautas pendientes · avance parcial» antes de cerrar su levantamiento.`);
+      } else if (summary.missing) {
+        suggestions.push(`${summary.missing} pautas requeridas no tienen registros. Confirme si la visita está pendiente o si falta sincronizar la captura.`);
+      }
+      const coverage = summary.required.map(({ instrument }) => instrument.id)
+        .filter((id, index, all) => all.indexOf(id) === index)
+        .map((id) => {
+          const instrument = INSTRUMENTS.find((item) => item.id === id);
+          const total = portfolioCache.filter((item) => localFieldStatus(item) === 'Operativo' && item.requiredInstruments.includes(id)).length;
+          const done = portfolioCache.filter((item) => localFieldStatus(item) === 'Operativo' && item.requiredInstruments.includes(id) && item.capture?.instruments?.[id]?.rows > 0).length;
+          return { label: instrument.label, total, done, rate: total ? done / total : 1 };
+        }).filter((item) => item.total);
+      if (coverage.length) {
+        coverage.sort((a, b) => a.rate - b.rate || a.label.localeCompare(b.label, 'es'));
+        if (coverage[0].rate < 1) {
+          suggestions.push(`La pauta con menor cobertura es ${coverage[0].label} (${coverage[0].done} de ${coverage[0].total}). Puede ser el foco de la próxima revisión de terreno.`);
+        }
+      }
+    }
+    if (summary.overdueCount) {
+      suggestions.push(`${summary.overdueCount} programaciones tienen fecha pasada y pautas aún pendientes según el estado manual. Confirme con la persona responsable y actualice los estados.`);
+    }
+    if (!suggestions.length) suggestions.push('No hay señales operativas pendientes en los datos disponibles. Mantenga la actualización de cartera y estados al día.');
+    list.replaceChildren(...suggestions.map((text) => element('li', '', text)));
+  }
+
+  function renderOverdueAssignments(overdue) {
+    const root = $('#dashboardOverdue');
+    if (!overdue.count) {
+      addEmptyState(root, 'No hay programaciones pasadas con pautas pendientes.');
+      return;
+    }
+    const list = document.createElement('ul');
+    list.className = 'overdue-list';
+    overdue.items.forEach((item) => {
+      const row = document.createElement('li');
+      const localName = item.localName ? ` · ${item.localName}` : '';
+      row.append(
+        element('strong', '', `${item.date} · ${item.localCode}${localName}`),
+        element('span', '', `${item.collector || 'Sin aplicador'} · Pendiente: ${item.pendingInstruments.join(', ')}`)
+      );
+      list.append(row);
+    });
+    root.replaceChildren(list);
+    if (overdue.count > overdue.items.length) {
+      root.append(element('p', 'dashboard-method', `Se muestran ${overdue.items.length} de ${overdue.count} programaciones. Actualice la cartera para revisar el resto.`));
+    }
+  }
+
+  function populateAdminControls() {
+    const currentCategory = $('#portfolioCategoryFilter').value;
+    const currentLocalCategory = $('#localCategoryFilter').value;
+    const categories = [...new Set(localCache.flatMap((local) =>
+      [local.category, local.subcategory].map((value) => String(value || '').trim()).filter(Boolean)
+    ))].sort((a, b) => a.localeCompare(b, 'es'));
+    const categoryOptions = () => [
+      new Option('Todos los tipos', ''),
+      ...categories.map((category) => new Option(category, category)),
+    ];
+    $('#portfolioCategoryFilter').replaceChildren(...categoryOptions());
+    $('#localCategoryFilter').replaceChildren(...categoryOptions());
+    if (categories.includes(currentCategory)) $('#portfolioCategoryFilter').value = currentCategory;
+    if (categories.includes(currentLocalCategory)) $('#localCategoryFilter').value = currentLocalCategory;
+
+    const portfolioStateFilter = $('#portfolioStateFilter');
+    if (portfolioStateFilter) {
+      const currentPortfolioState = portfolioStateFilter.value;
+      portfolioStateFilter.replaceChildren(...buildStateFilterOptions(portfolioCache, 'Todos los estados'));
+      portfolioStateFilter.value = currentPortfolioState;
+    }
+
+    const localStateFilter = $('#localStateFilter');
+    if (localStateFilter) {
+      const currentLocalState = localStateFilter.value;
+      localStateFilter.replaceChildren(...buildStateFilterOptions(localCache, 'Todos los estados'));
+      localStateFilter.value = currentLocalState;
+    }
+
+    const ownerFilter = $('#ownerFilter');
+    const currentOwner = ownerFilter.value;
+    ownerFilter.replaceChildren(
+      new Option('Todas las personas', ''),
+      new Option('Sin asignar', UNASSIGNED),
+      ...collectorNames.map((name) => new Option(name, name))
+    );
+    ownerFilter.value = currentOwner;
+
+    const bulk = $('#bulkCollector');
+    const ownerOptions = () => [...collectorNames.map((name) => new Option(name, name)), new Option('Sin asignar', UNASSIGNED)];
+    bulk.replaceChildren(new Option('Mover selección a…', ''), ...ownerOptions());
+    $('#detailOwnerMove').replaceChildren(new Option('Mover este local a…', ''), ...ownerOptions());
+
+    const collector = $('#assignmentCollector');
+    const selectedCollector = collector.value;
+    collector.replaceChildren(new Option('Selecciona aplicador/a', ''), ...collectorNames.map((name) => new Option(name, name)));
+    if (collectorNames.includes(selectedCollector)) collector.value = selectedCollector;
+    updateLocalOptions();
+  }
+
+  // ---------- Admin: drag & drop board ----------
+  function ownerKey(item) {
+    return item.collector || UNASSIGNED;
+  }
+
+  function filteredUniverse() {
+    const query = $('#portfolioSearch').value.trim().toLocaleLowerCase('es');
+    const owner = $('#ownerFilter').value;
+    const category = $('#portfolioCategoryFilter').value;
+    const stateFilter = $('#portfolioStateFilter') ? $('#portfolioStateFilter').value : '';
+    return portfolioCache.filter((item) => {
+      if (owner && ownerKey(item) !== owner) return false;
+      if (category && item.category !== category && item.subcategory !== category) return false;
+      if (!matchesLocalStateFilter(item, stateFilter)) return false;
+      const searchable = `${item.code} ${item.name} ${item.address} ${item.collector} ${item.category} ${item.subcategory} ${localFieldStatus(item)} ${item.fieldNote || ''}`.toLocaleLowerCase('es');
+      return !query || searchable.includes(query);
+    });
+  }
+
+  function renderQuickFilters() {
+    const container = $('#portfolioQuickFilters');
+    if (!container) return;
+    const counts = computeStateCounts(portfolioCache);
+    const activeFilter = $('#portfolioStateFilter') ? $('#portfolioStateFilter').value : '';
+    const pills = [
+      { value: '', label: `Todos (${counts.total})`, className: '' },
+      { value: 'no_applied', label: `Sin pautas aplicadas (${counts.no_applied})`, className: 'pill-unstarted' },
+      { value: 'pending_any', label: `Con pautas pendientes (${counts.pending_any})`, className: 'pill-pending' },
+      { value: 'pending_partial', label: `Avance parcial (${counts.pending_partial})`, className: 'pill-partial' },
+      { value: 'complete', label: `Pautas completas (${counts.complete})`, className: 'pill-complete' },
+      { value: 'closed_or_rejected', label: `Cerrado / Rechazo (${counts.closed_or_rejected})`, className: 'pill-incident' },
+    ];
+    const fragment = document.createDocumentFragment();
+    pills.forEach((pill) => {
+      const button = element('button', `quick-filter-pill ${pill.className}${activeFilter === pill.value ? ' is-active' : ''}`, pill.label);
+      button.type = 'button';
+      button.dataset.stateFilter = pill.value;
+      button.setAttribute('aria-pressed', String(activeFilter === pill.value));
+      fragment.append(button);
+    });
+    container.replaceChildren(fragment);
+  }
+
+  function renderBoard() {
+    populateStateFilterDropdowns();
+    renderQuickFilters();
+    renderUniverse();
+    renderTargets();
+    renderOwnerList();
+    renderSelectionBar();
+    renderDetail();
+    renderFieldIncidentsPanel();
+    const assigned = portfolioCache.filter((item) => item.collector).length;
+    const counts = computeStateCounts(portfolioCache);
+    $('#portfolioCount').textContent = `${assigned} de ${portfolioCache.length} con responsable · ${counts.no_applied} sin pautas · ${counts.pending_any} con pendientes · ${counts.closed_or_rejected} cerrado/rechazo`;
+  }
+
+  function populateStateFilterDropdowns() {
+    const portfolioStateFilter = $('#portfolioStateFilter');
+    if (portfolioStateFilter) {
+      const current = portfolioStateFilter.value;
+      portfolioStateFilter.replaceChildren(...buildStateFilterOptions(portfolioCache, 'Todos los estados'));
+      portfolioStateFilter.value = current;
+    }
+    const localStateFilter = $('#localStateFilter');
+    if (localStateFilter) {
+      const current = localStateFilter.value;
+      localStateFilter.replaceChildren(...buildStateFilterOptions(localCache, 'Todos los estados'));
+      localStateFilter.value = current;
+    }
+  }
+
+  function boardCard(item, showOwner) {
+    const status = localFieldStatus(item);
+    const card = element('article', `board-card${status === 'Cerrado' ? ' is-closed' : status === 'Rechazo' ? ' is-rejected' : ''}`);
+    card.draggable = true;
+    card.dataset.code = item.code;
+    card.classList.toggle('is-selected', selectedCodes.has(item.code));
+    card.classList.toggle('is-open', detailCode === item.code);
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.className = 'card-check';
+    check.checked = selectedCodes.has(item.code);
+    check.setAttribute('aria-label', `Seleccionar ${item.code} ${item.name}`);
+    const open = element('button', 'card-open');
+    open.type = 'button';
+    open.append(element('strong', '', item.code), document.createTextNode(` ${item.name}`));
+    const meta = element('p', 'card-meta', item.address || 'Dirección no registrada');
+    const foot = element('p', 'card-foot');
+    const localType = [item.category, item.subcategory].filter(Boolean).join(' · ');
+    if (localType) foot.append(element('span', 'category-tag', localType));
+    if (showOwner) foot.append(element('span', `owner-tag${item.collector ? '' : ' is-empty'}`, item.collector || 'Sin asignar'));
+    if (status === 'Cerrado' || status === 'Rechazo') {
+      foot.append(element('span', `field-tag ${status === 'Cerrado' ? 'is-closed' : 'is-rejected'}`, status));
+    }
+    if (item.capture) {
+      foot.append(element('span', evidenceBadgeClass(item), captureSummary(item)));
+    }
+    card.append(check, open, meta);
+    if (status !== 'Operativo' && item.fieldNote) {
+      card.append(element('p', 'card-field-note', `Observación: ${item.fieldNote}`));
+    } else if (status === 'Operativo' && item.capture && item.capture.recordedCount > 0 && item.capture.recordedCount < item.capture.requiredCount) {
+      const pending = pendingInstrumentLabels(item);
+      if (pending.length) {
+        card.append(element('p', 'card-pending-note', `Faltan: ${pending.join(', ')}`));
+      }
+    }
+    card.append(foot);
+    return card;
+  }
+
+  function renderUniverse() {
+    const list = $('#universeList');
+    const items = filteredUniverse();
+    $('#universeCount').textContent = `${items.length} de ${portfolioCache.length}`;
+    if (!items.length) {
+      addEmptyState(list, 'No hay locales con estos filtros.');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    items.forEach((item) => fragment.append(boardCard(item, true)));
+    list.replaceChildren(fragment);
+  }
+
+  function renderTargets() {
+    const container = $('#collectorTargets');
+    const fragment = document.createDocumentFragment();
+    [...collectorNames, UNASSIGNED].forEach((owner) => {
+      const items = portfolioCache.filter((item) => ownerKey(item) === owner);
+      const counts = computeStateCounts(items);
+      const target = element('button', `collector-target${owner === UNASSIGNED ? ' is-unassigned' : ''}`);
+      target.type = 'button';
+      target.dataset.dropOwner = owner;
+      target.setAttribute('aria-pressed', String(activeOwner === owner));
+      target.classList.toggle('is-active', activeOwner === owner);
+      const summaryParts = [
+        `${counts.no_applied} sin pautas`,
+        `${counts.pending_partial} parciales`,
+        `${counts.complete} completos`,
+      ];
+      if (counts.closed_or_rejected) summaryParts.push(`${counts.closed_or_rejected} cerrado/rechazo`);
+      target.append(
+        element('strong', '', owner === UNASSIGNED ? 'Sin asignar' : owner),
+        element('span', 'target-count', `${items.length} ${items.length === 1 ? 'local' : 'locales'}`),
+        element('span', 'target-meta', owner === UNASSIGNED ? `Suelta aquí para liberar · ${summaryParts.join(' · ')}` : summaryParts.join(' · '))
+      );
+      fragment.append(target);
+    });
+    container.replaceChildren(fragment);
+  }
+
+  function renderOwnerList() {
+    const list = $('#ownerList');
+    const title = $('#ownerTitle');
+    list.dataset.dropOwner = activeOwner;
+    if (!activeOwner) {
+      title.textContent = 'Locales por persona';
+      $('#ownerCount').textContent = '';
+      addEmptyState(list, 'Elige una persona en la columna central para ver y ordenar su cartera.');
+      return;
+    }
+    const items = portfolioCache.filter((item) => ownerKey(item) === activeOwner);
+    const counts = computeStateCounts(items);
+    title.textContent = activeOwner === UNASSIGNED ? 'Locales sin asignar' : `Cartera de ${activeOwner}`;
+    $('#ownerCount').textContent = `${items.length} (${counts.no_applied} sin pautas · ${counts.pending_any} con pendientes)`;
+    if (!items.length) {
+      addEmptyState(list, 'Sin locales. Arrastra tarjetas aquí para asignarlas.');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    items.forEach((item) => fragment.append(boardCard(item, false)));
+    list.replaceChildren(fragment);
+  }
+
+  function renderSelectionBar() {
+    const count = selectedCodes.size;
+    $('#selectionCount').textContent = count
+      ? `${count} ${count === 1 ? 'local seleccionado' : 'locales seleccionados'}`
+      : 'Marca locales para moverlos en grupo';
+    $('#bulkMoveButton').disabled = !count;
+    $('#clearSelection').disabled = !count;
+    const applyAll = $('#applyInstrumentsToSelection');
+    if (applyAll) {
+      applyAll.hidden = count < 2;
+      applyAll.textContent = `Aplicar a la selección (${count})`;
+    }
+  }
+
+  function renderDetail() {
+    const panel = $('#localDetail');
+    const item = portfolioCache.find((entry) => entry.code === detailCode);
+    if (!item) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
+    $('#detailTitle').textContent = `${item.code} · ${item.name}`;
+    $('#detailMeta').textContent = item.address || 'Dirección no registrada';
+    $('#detailOwner').textContent = item.collector ? `Responsable: ${item.collector} · ${item.status}` : `Sin responsable · ${item.status}`;
+    const capture = item.capture || { visits: 0, instruments: {}, requiredCount: 0, recordedCount: 0 };
+    const pending = pendingInstrumentLabels(item);
+    const pendingSummary = !capture.requiredCount
+      ? 'Sin pautas requeridas.'
+      : capture.recordedCount === 0
+        ? `Sin pautas aplicadas (0 de ${capture.requiredCount}).`
+        : capture.recordedCount < capture.requiredCount
+          ? `Con pautas pendientes (${capture.recordedCount} de ${capture.requiredCount} aplicadas · faltan: ${pending.join(', ')}).`
+          : `Todas las pautas requeridas aplicadas (${capture.recordedCount} de ${capture.requiredCount}).`;
+    const visitSummary = capture.visits
+      ? `${capture.visits} ${capture.visits === 1 ? 'visita registrada' : 'visitas registradas'} en captura · última ${capture.lastVisitDate || 'sin fecha'}${capture.lastCollector ? ` por ${capture.lastCollector}` : ''}.`
+      : 'Aún sin visitas registradas en la captura.';
+    $('#detailCapture').textContent = `${pendingSummary} ${visitSummary}`;
+    const fieldset = $('#detailInstruments');
+    const legend = element('legend', '', 'Pautas que debe completar');
+    const rows = INSTRUMENTS.map((instrument) => {
+      const state = capture.instruments && capture.instruments[instrument.id];
+      const label = element('label', 'detail-instrument');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = instrument.id;
+      checkbox.checked = item.requiredInstruments.includes(instrument.id);
+      const chip = element('span', `state-chip ${stateClass(state ? state.state : '')}`, state ? state.state : 'Sin datos');
+      label.append(checkbox, element('span', '', instrument.label), chip);
+      return label;
+    });
+    fieldset.replaceChildren(legend, ...rows);
+    $('#detailMessage').textContent = '';
+    $('#detailMessage').classList.remove('error');
+    const fieldStatusSelect = $('#detailFieldStatus');
+    const fieldNoteInput = $('#detailFieldNote');
+    const fieldMeta = $('#detailFieldMeta');
+    if (fieldStatusSelect && fieldNoteInput && fieldMeta) {
+      const status = localFieldStatus(item);
+      fieldStatusSelect.value = status;
+      fieldNoteInput.value = item.fieldNote || '';
+      fieldMeta.classList.remove('error');
+      fieldMeta.textContent = status !== 'Operativo'
+        ? `Estado actual: ${status}${item.fieldNote ? ` · «${item.fieldNote}»` : ''}${item.fieldUpdatedBy ? ` · Registrado por ${item.fieldUpdatedBy}` : ''}${item.fieldUpdatedAt ? ` (${item.fieldUpdatedAt})` : ''}`
+        : (item.fieldUpdatedBy ? `Estado actual: Operativo · última actualización por ${item.fieldUpdatedBy}${item.fieldUpdatedAt ? ` (${item.fieldUpdatedAt})` : ''}` : 'Estado actual: Operativo.');
+    }
+  }
+
+  function renderFieldIncidentsPanel() {
+    const select = $('#incidentLocal');
+    const list = $('#fieldIncidentsList');
+    const countNode = $('#fieldIncidentsCount');
+    if (!select || !list) return;
+    const previousCode = select.value;
+    select.replaceChildren(
+      new Option('Selecciona un local…', ''),
+      ...portfolioCache.map((item) => {
+        const status = localFieldStatus(item);
+        const tag = status !== 'Operativo' ? ` [${status.toUpperCase()}]` : '';
+        return new Option(`${item.code} · ${item.name}${tag} · ${item.collector || 'Sin asignar'}`, item.code);
+      })
+    );
+    if (portfolioCache.some((item) => item.code === previousCode)) {
+      select.value = previousCode;
+    }
+    const incidents = portfolioCache.filter((item) => localFieldStatus(item) !== 'Operativo');
+    if (countNode) {
+      const closed = incidents.filter((item) => localFieldStatus(item) === 'Cerrado').length;
+      const rejected = incidents.filter((item) => localFieldStatus(item) === 'Rechazo').length;
+      countNode.textContent = incidents.length
+        ? `${incidents.length} con incidencia (${closed} cerrados · ${rejected} rechazo)`
+        : '0 locales cerrados o con rechazo';
+    }
+    if (!incidents.length) {
+      addEmptyState(list, 'No hay locales registrados como cerrados o con rechazo en este momento.');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    incidents.forEach((item) => {
+      const status = localFieldStatus(item);
+      const row = element('article', `incident-row ${status === 'Cerrado' ? 'is-closed' : 'is-rejected'}`);
+      const info = element('div', 'incident-info');
+      const titleLine = element('div', 'incident-topline');
+      titleLine.append(
+        element('span', `field-tag ${status === 'Cerrado' ? 'is-closed' : 'is-rejected'}`, status),
+        element('strong', '', `${item.code} · ${item.name}`),
+        element('span', 'owner-tag', item.collector || 'Sin asignar')
+      );
+      const addressLine = element('p', 'assignment-meta', `${item.address || 'Dirección no registrada'} · ${captureSummary(item)}`);
+      const noteLine = element('p', 'incident-note', item.fieldNote ? `Motivo: ${item.fieldNote}` : 'Sin observación adicional registrada.');
+      const auditParts = [];
+      if (item.fieldUpdatedBy) auditParts.push(`Reportado por ${item.fieldUpdatedBy}`);
+      if (item.fieldUpdatedAt) auditParts.push(`el ${item.fieldUpdatedAt}`);
+      if (auditParts.length) {
+        noteLine.append(document.createTextNode(` (${auditParts.join(' ')})`));
+      }
+      info.append(titleLine, addressLine, noteLine);
+      const actions = element('div', 'incident-actions');
+      const inspectButton = element('button', 'quiet-button', 'Abrir ficha');
+      inspectButton.type = 'button';
+      inspectButton.addEventListener('click', () => {
+        detailCode = item.code;
+        renderBoard();
+        $('#localDetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+      const reopenButton = element('button', 'secondary-button', 'Marcar operativo');
+      reopenButton.type = 'button';
+      reopenButton.addEventListener('click', () => {
+        savePortfolioFieldStatus([item.code], 'Operativo', '', reopenButton);
+      });
+      actions.append(inspectButton, reopenButton);
+      row.append(info, actions);
+      fragment.append(row);
+    });
+    list.replaceChildren(fragment);
+  }
+
+  function renderConsolidatedSyncStatus(isSynced) {
+    const statusNode = $('#consolidatedSyncStatus');
+    const button = $('#syncConsolidatedButton');
+    if (!statusNode || !button) return;
+    if (isSynced) {
+      statusNode.textContent = 'Consolidación activa: locales nuevos de terreno, homologaciones de códigos temporales, cierres/rechazos confirmados y alcances de pautas por sistema ya están integrados en la cartera. Puedes volver a sincronizar si entraron nuevos locales en Visitas.';
+      button.textContent = 'Resincronizar locales y decisiones';
+    } else {
+      statusNode.textContent = '';
+      button.textContent = 'Integrar locales nuevos y decisiones';
+    }
+  }
+
+  function syncConsolidatedDecisions(event) {
+    const button = event.currentTarget;
+    setBusy(button, true, 'Integrando…');
+    runServer('apiSyncConsolidatedDecisions', currentSession.token)
+      .then((result) => loadAdminData(
+        `Consolidación integrada: ${result.totalPortfolio} locales en cartera (${result.addedLocals} altas nuevas incorporadas, ${result.closedLocals} cerrados/duplicados, ${result.rejectedLocals} con rechazo, ${result.adjustedInstruments} alcances de pautas ajustados).`
+      ))
+      .catch((error) => {
+        if (!handleSessionError(error)) showPortalAlert(error.message, true);
+      })
+      .finally(() => setBusy(button, false));
+  }
+
+  function savePortfolioFieldStatus(codes, fieldStatus, fieldNote, button, feedbackNode) {
+    if (!codes || !codes.length) return Promise.resolve();
+    if (feedbackNode) {
+      feedbackNode.classList.remove('error');
+      feedbackNode.textContent = '';
+      feedbackNode.hidden = true;
+    }
+    setBusy(button, true, 'Guardando…');
+    return runServer('apiUpdatePortfolioFieldStatus', currentSession.token, {
+      localCodes: codes,
+      fieldStatus,
+      fieldNote,
+    })
+      .then((result) => {
+        const message = `${result.codes.join(', ')} quedó registrado como «${result.fieldStatus}»${result.fieldNote ? ` (${result.fieldNote})` : ''}.`;
+        if (PAGE_ROLE === 'admin') {
+          return loadAdminData(message);
+        }
+        return loadWorkspace(message);
+      })
+      .catch((error) => {
+        if (handleSessionError(error)) return;
+        if (feedbackNode) {
+          feedbackNode.textContent = error.message;
+          feedbackNode.classList.add('error');
+          feedbackNode.hidden = false;
+        } else {
+          showPortalAlert(error.message, true);
+        }
+      })
+      .finally(() => setBusy(button, false));
+  }
+
+  function codesFromCard(card) {
+    const code = card.dataset.code;
+    return selectedCodes.has(code) ? [...selectedCodes] : [code];
+  }
+
+  function moveLocals(codes, owner) {
+    const collector = owner === UNASSIGNED ? '' : owner;
+    const movable = codes.filter((code) => {
+      const item = portfolioCache.find((entry) => entry.code === code);
+      return item && item.collector !== collector;
+    });
+    if (!movable.length) return Promise.resolve();
+    showPortalAlert(`Moviendo ${movable.length} ${movable.length === 1 ? 'local' : 'locales'}…`, false);
+    document.body.classList.add('is-saving');
+    return runServer('apiMovePortfolioLocals', currentSession.token, { localCodes: movable, collector })
+      .then((result) => {
+        portfolioCache.forEach((item) => {
+          if (result.codes.includes(item.code)) {
+            item.collector = result.collector;
+            item.status = result.status;
+          }
+        });
+        localCache.forEach((local) => {
+          if (result.codes.includes(local.code)) local.suggestedCollector = result.collector;
+        });
+        selectedCodes = new Set([...selectedCodes].filter((code) => !result.codes.includes(code)));
+        renderBoard();
+        updateLocalOptions();
+        showPortalAlert(`${result.codes.length} ${result.codes.length === 1 ? 'local quedó' : 'locales quedaron'} ${result.collector ? `a cargo de ${result.collector}` : 'sin asignar'}.`, false);
+      })
+      .catch((error) => {
+        if (!handleSessionError(error)) showPortalAlert(error.message, true);
+      })
+      .finally(() => document.body.classList.remove('is-saving'));
+  }
+
+  function saveInstruments(codes, button) {
+    const instruments = [...$('#detailInstruments').querySelectorAll('input:checked')].map((input) => input.value);
+    const message = $('#detailMessage');
+    message.classList.remove('error');
+    message.textContent = '';
+    setBusy(button, true, 'Guardando…');
+    runServer('apiUpdatePortfolioInstruments', currentSession.token, { localCodes: codes, instruments })
+      .then((result) => loadAdminData(`Pautas actualizadas para ${result.codes.length} ${result.codes.length === 1 ? 'local' : 'locales'}.`))
+      .catch((error) => {
+        if (handleSessionError(error)) return;
+        message.textContent = error.message;
+        message.classList.add('error');
+      })
+      .finally(() => setBusy(button, false));
+  }
+
+  function bindBoard() {
+    const board = $('#portfolioBoard');
+    board.addEventListener('change', (event) => {
+      const check = event.target.closest('.card-check');
+      if (!check) return;
+      const code = check.closest('.board-card').dataset.code;
+      if (check.checked) selectedCodes.add(code);
+      else selectedCodes.delete(code);
+      document.querySelectorAll(`.board-card[data-code="${code}"]`).forEach((card) => {
+        card.classList.toggle('is-selected', check.checked);
+        $('.card-check', card).checked = check.checked;
+      });
+      renderSelectionBar();
+    });
+    board.addEventListener('click', (event) => {
+      const open = event.target.closest('.card-open');
+      if (open) {
+        detailCode = open.closest('.board-card').dataset.code;
+        renderUniverse();
+        renderOwnerList();
+        renderDetail();
+        $('#localDetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        return;
+      }
+      const target = event.target.closest('.collector-target');
+      if (target) {
+        activeOwner = activeOwner === target.dataset.dropOwner ? '' : target.dataset.dropOwner;
+        renderTargets();
+        renderOwnerList();
+      }
+    });
+    board.addEventListener('dragstart', (event) => {
+      const card = event.target.closest('.board-card');
+      if (!card) return;
+      const codes = codesFromCard(card);
+      event.dataTransfer.setData('text/plain', JSON.stringify(codes));
+      event.dataTransfer.effectAllowed = 'move';
+      card.classList.add('is-dragging');
+      board.classList.add('is-dragging');
+      $('#dragHint').textContent = `Arrastrando ${codes.length} ${codes.length === 1 ? 'local' : 'locales'}`;
+    });
+    board.addEventListener('dragend', (event) => {
+      const card = event.target.closest('.board-card');
+      if (card) card.classList.remove('is-dragging');
+      board.classList.remove('is-dragging');
+      board.querySelectorAll('.is-over').forEach((node) => node.classList.remove('is-over'));
+      $('#dragHint').textContent = '';
+    });
+    board.addEventListener('dragover', (event) => {
+      const target = event.target.closest('[data-drop-owner]');
+      if (!target || !target.dataset.dropOwner) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      target.classList.add('is-over');
+    });
+    board.addEventListener('dragleave', (event) => {
+      const target = event.target.closest('[data-drop-owner]');
+      if (target && !target.contains(event.relatedTarget)) target.classList.remove('is-over');
+    });
+    board.addEventListener('drop', (event) => {
+      const target = event.target.closest('[data-drop-owner]');
+      if (!target || !target.dataset.dropOwner) return;
+      event.preventDefault();
+      target.classList.remove('is-over');
+      let codes = [];
+      try {
+        codes = JSON.parse(event.dataTransfer.getData('text/plain') || '[]');
+      } catch (error) {
+        codes = [];
+      }
+      if (Array.isArray(codes) && codes.length) moveLocals(codes, target.dataset.dropOwner);
+    });
+    ['#portfolioSearch', '#ownerFilter', '#portfolioCategoryFilter', '#portfolioStateFilter'].forEach((selector) => {
+      const node = $(selector);
+      if (!node) return;
+      node.addEventListener(selector === '#portfolioSearch' ? 'input' : 'change', () => {
+        renderQuickFilters();
+        renderUniverse();
+      });
+    });
+    const quickFilters = $('#portfolioQuickFilters');
+    if (quickFilters) {
+      quickFilters.addEventListener('click', (event) => {
+        const pill = event.target.closest('[data-state-filter]');
+        if (!pill) return;
+        const filterSelect = $('#portfolioStateFilter');
+        if (!filterSelect) return;
+        const targetValue = pill.dataset.stateFilter;
+        filterSelect.value = filterSelect.value === targetValue && targetValue !== '' ? '' : targetValue;
+        renderQuickFilters();
+        renderUniverse();
+      });
+    }
+    $('#selectVisible').addEventListener('click', () => {
+      filteredUniverse().forEach((item) => selectedCodes.add(item.code));
+      renderBoard();
+    });
+    $('#clearSelection').addEventListener('click', () => {
+      selectedCodes.clear();
+      renderBoard();
+    });
+    $('#bulkMoveButton').addEventListener('click', () => {
+      const owner = $('#bulkCollector').value;
+      if (!owner) {
+        showPortalAlert('Elige a quién mover la selección.', true);
+        return;
+      }
+      moveLocals([...selectedCodes], owner);
+    });
+    $('#detailOwnerMove').addEventListener('change', (event) => {
+      const owner = event.target.value;
+      event.target.value = '';
+      if (owner && detailCode) moveLocals([detailCode], owner);
+    });
+    $('#saveInstruments').addEventListener('click', (event) => saveInstruments([detailCode], event.currentTarget));
+    $('#applyInstrumentsToSelection').addEventListener('click', (event) => saveInstruments([...selectedCodes], event.currentTarget));
+    const saveFieldStatusButton = $('#saveFieldStatus');
+    if (saveFieldStatusButton) {
+      saveFieldStatusButton.addEventListener('click', (event) => {
+        if (!detailCode) return;
+        savePortfolioFieldStatus(
+          [detailCode],
+          $('#detailFieldStatus').value,
+          $('#detailFieldNote').value.trim(),
+          event.currentTarget,
+          $('#detailFieldMeta')
+        );
+      });
+    }
+    const incidentLocalSelect = $('#incidentLocal');
+    if (incidentLocalSelect) {
+      incidentLocalSelect.addEventListener('change', () => {
+        const item = portfolioCache.find((entry) => entry.code === incidentLocalSelect.value);
+        if (!item) return;
+        const status = localFieldStatus(item);
+        $('#incidentStatus').value = status === 'Operativo' ? 'Cerrado' : status;
+        $('#incidentNote').value = item.fieldNote || '';
+      });
+    }
+    const incidentForm = $('#fieldIncidentForm');
+    if (incidentForm) {
+      incidentForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const code = $('#incidentLocal').value;
+        if (!code) return;
+        savePortfolioFieldStatus(
+          [code],
+          $('#incidentStatus').value,
+          $('#incidentNote').value.trim(),
+          $('#saveIncidentButton'),
+          $('#incidentFormMessage')
+        ).then(() => {
+          $('#incidentNote').value = '';
+        });
+      });
+    }
+    $('#closeDetail').addEventListener('click', () => {
+      detailCode = '';
+      renderBoard();
+    });
+  }
+
+  // ---------- Admin: daily assignments ----------
+  function localAssignmentOptionSummary(local) {
+    const status = localFieldStatus(local);
+    const statusPrefix = status !== 'Operativo' ? `[${status.toUpperCase()}] · ` : '';
+    const capture = local && local.capture;
+    if (!capture) return status !== 'Operativo' ? `[${status.toUpperCase()}]` : '';
+    return `${statusPrefix}${captureSummary(local)}`;
+  }
+
+  function updateLocalOptions() {
+    const select = $('#assignmentLocal');
+    if (!select) return;
+    const previous = select.value;
+    const query = $('#localSearch').value.trim().toLocaleLowerCase('es');
+    const category = $('#localCategoryFilter').value;
+    const stateFilter = $('#localStateFilter') ? $('#localStateFilter').value : '';
+    const filtered = localCache.filter((local) => {
+      if (category && local.category !== category && local.subcategory !== category) return false;
+      if (!matchesLocalStateFilter(local, stateFilter)) return false;
+      const searchable = `${local.code} ${local.name} ${local.address} ${local.category} ${local.subcategory} ${localFieldStatus(local)} ${local.fieldNote || ''}`.toLocaleLowerCase('es');
+      return !query || searchable.includes(query);
+    });
+    select.replaceChildren(new Option(filtered.length ? `Selecciona un local (${filtered.length} disponibles)` : 'No hay coincidencias con estos filtros', ''));
+    filtered.forEach((local) => {
+      const summary = localAssignmentOptionSummary(local);
+      select.add(new Option(`${local.code} · ${local.name} · ${local.category}${summary ? ` — ${summary}` : ''}`, local.code));
+    });
+    if (filtered.some((local) => local.code === previous)) select.value = previous;
+    describeSelectedLocal();
+  }
+
+  function describeSelectedLocal() {
+    const local = localCache.find((item) => item.code === $('#assignmentLocal').value);
+    const hint = $('#suggestedPerson');
+    if (!local) {
+      hint.textContent = 'Elige el local y luego a la persona de esta jornada.';
+    } else {
+      const status = localFieldStatus(local);
+      const pending = pendingInstrumentLabels(local);
+      const pautasInfo = local.capture
+        ? `${captureSummary(local)}${pending.length && local.capture.recordedCount > 0 ? ` (faltan: ${pending.join(', ')})` : ''}`
+        : '';
+      const incidentInfo = status !== 'Operativo'
+        ? ` · Atención: local registrado como ${status.toUpperCase()}${local.fieldNote ? ` («${local.fieldNote}»)` : ''}`
+        : '';
+      hint.textContent = `Responsable en cartera: ${local.suggestedCollector || 'sin asignar'}${pautasInfo ? ` · ${pautasInfo}` : ''}${incidentInfo}.`;
+    }
+    const review = $('#locationReview');
+    const checkbox = $('#confirmedLocation');
+    const alert = local && local.alert;
+    review.hidden = !alert;
+    checkbox.checked = false;
+    checkbox.required = Boolean(alert);
+    if (alert) $('#locationReviewText').textContent = alert;
+  }
+
+  function instrumentProgress(assignment) {
+    const required = Object.values(assignment.statuses).filter((status) => status.required);
+    const complete = required.filter((status) => status.status === 'Completo' || status.status === 'No aplica').length;
+    const blocked = required.filter((status) => status.status === 'Bloqueado').length;
+    return { complete, total: required.length, blocked };
+  }
+
+  function renderAdminAssignments(assignments) {
+    const container = $('#adminAssignments');
+    $('#assignmentCount').textContent = `${assignments.length} ${assignments.length === 1 ? 'local asignado' : 'locales asignados'} para esta fecha`;
+    if (!assignments.length) {
+      addEmptyState(container, 'No hay asignaciones para esta fecha.');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    assignments.forEach((assignment) => {
+      const row = element('article', 'assignment-row');
+      const top = element('div', 'assignment-topline');
+      const description = document.createElement('div');
+      description.append(
+        element('p', 'assignment-name', `${assignment.localCode} · ${assignment.localName}`),
+        element('p', 'assignment-meta', assignment.address || 'Dirección no registrada')
+      );
+      top.append(description, element('strong', '', assignment.collector));
+      const summary = instrumentProgress(assignment);
+      const chips = element('div', 'state-summary');
+      INSTRUMENTS.forEach((instrument) => {
+        const item = assignment.statuses[instrument.id];
+        if (item.required) chips.append(element('span', `state-chip ${stateClass(item.status)}`, `${instrument.label}: ${item.status}`));
+      });
+      row.append(top, element('p', 'assignment-details', `${summary.complete} de ${summary.total} pautas cerradas${summary.blocked ? ` · ${summary.blocked} bloqueadas` : ''}`), chips);
+      if (assignment.assignmentStatus === 'Cancelada') {
+        row.append(element('p', 'cancelled-label', `Asignación cancelada · ${assignment.cancellationReason || 'sin motivo'}`));
+      } else {
+        row.append(createEditControls(assignment));
+      }
+      fragment.append(row);
+    });
+    container.replaceChildren(fragment);
+  }
+
+  function renderAdminProposals(proposals) {
+    const container = $('#adminProposals');
+    $('#proposalCount').textContent = `${proposals.length} ${proposals.length === 1 ? 'propuesta pendiente' : 'propuestas pendientes'}`;
+    if (!proposals.length) {
+      addEmptyState(container, 'No hay propuestas pendientes. Las nuevas solicitudes aparecerán aquí.');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    proposals.forEach((proposal) => {
+      const row = element('article', 'assignment-row proposal-row');
+      const top = element('div', 'assignment-topline');
+      const details = document.createElement('div');
+      details.append(
+        element('p', 'assignment-name', `${proposal.date}${proposal.proposedTime ? ` · ${proposal.proposedTime}` : ''} · ${proposal.localCode} · ${proposal.localName}`),
+        element('p', 'assignment-meta', `${proposal.collector} · ${proposal.address || 'Dirección no registrada'}`)
+      );
+      top.append(details, element('span', 'state-chip state-progress', 'Por aprobar'));
+      row.append(top);
+      if (proposal.requestNote) row.append(element('p', 'assignment-details', `Nota del equipo: ${proposal.requestNote}`));
+      const required = INSTRUMENTS.filter((instrument) => proposal.statuses[instrument.id]?.required)
+        .map((instrument) => instrument.label);
+      row.append(element('p', 'assignment-details', `Pautas: ${required.join(', ') || 'sin detalle'}`));
+
+      const actions = element('div', 'proposal-actions');
+      const approve = element('button', 'primary-button', 'Aprobar');
+      approve.type = 'button';
+      approve.addEventListener('click', () => respondToProposal(proposal, 'approve', approve));
+      actions.append(approve);
+
+      const rescheduleDetails = element('details', 'proposal-response');
+      rescheduleDetails.append(element('summary', '', 'Reprogramar'));
+      const rescheduleForm = element('form', 'proposal-response-form');
+      rescheduleForm.dataset.assignmentId = proposal.id;
+      rescheduleForm.dataset.decision = 'reschedule';
+      const dateLabel = element('label', '', 'Nueva fecha');
+      const dateInput = document.createElement('input');
+      dateInput.type = 'date';
+      dateInput.name = 'date';
+      dateInput.min = localToday();
+      dateInput.value = proposal.date < localToday() ? localToday() : proposal.date;
+      dateInput.required = true;
+      dateLabel.append(dateInput);
+      const timeLabel = element('label', '', 'Hora propuesta (opcional)');
+      const timeInput = document.createElement('input');
+      timeInput.type = 'time';
+      timeInput.name = 'time';
+      timeInput.value = proposal.proposedTime || '';
+      timeLabel.append(timeInput);
+      const noteLabel = element('label', '', 'Nota para el equipo (opcional)');
+      const noteInput = document.createElement('input');
+      noteInput.type = 'text';
+      noteInput.name = 'reason';
+      noteInput.maxLength = 300;
+      noteInput.placeholder = 'Motivo del cambio o indicación logística';
+      noteLabel.append(noteInput);
+      const rescheduleButton = element('button', 'secondary-button', 'Reprogramar y aprobar');
+      rescheduleButton.type = 'submit';
+      rescheduleForm.append(dateLabel, timeLabel, noteLabel, rescheduleButton);
+      rescheduleForm.addEventListener('submit', submitProposalResponse);
+      rescheduleDetails.append(rescheduleForm);
+      actions.append(rescheduleDetails);
+
+      const rejectDetails = element('details', 'proposal-response');
+      rejectDetails.append(element('summary', '', 'Rechazar'));
+      const rejectForm = element('form', 'proposal-response-form');
+      rejectForm.dataset.assignmentId = proposal.id;
+      rejectForm.dataset.decision = 'reject';
+      const reasonLabel = element('label', '', 'Motivo (requerido)');
+      const reason = document.createElement('textarea');
+      reason.name = 'reason';
+      reason.maxLength = 300;
+      reason.required = true;
+      reason.rows = 2;
+      reasonLabel.append(reason);
+      const rejectButton = element('button', 'secondary-button cancel-button', 'Rechazar propuesta');
+      rejectButton.type = 'submit';
+      rejectForm.append(reasonLabel, rejectButton);
+      rejectForm.addEventListener('submit', submitProposalResponse);
+      rejectDetails.append(rejectForm);
+      actions.append(rejectDetails);
+      row.append(actions);
+      fragment.append(row);
+    });
+    container.replaceChildren(fragment);
+  }
+
+  function submitProposalResponse(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const decision = form.dataset.decision;
+    const payload = {
+      assignmentId: form.dataset.assignmentId,
+      decision,
+      reason: $('input[name="reason"], textarea[name="reason"]', form)?.value.trim() || '',
+    };
+    if (decision === 'reschedule') {
+      payload.date = $('input[name="date"]', form).value;
+      payload.time = $('input[name="time"]', form).value;
+    }
+    respondToProposal(payload, decision, $('button[type="submit"]', form));
+  }
+
+  function respondToProposal(proposal, decision, button) {
+    const payload = proposal.assignmentId
+      ? proposal
+      : { assignmentId: proposal.id, decision, date: proposal.date, time: proposal.proposedTime, reason: '' };
+    setBusy(button, true, decision === 'reject' ? 'Rechazando…' : 'Guardando…');
+    runServer('apiRespondToVisitProposal', currentSession.token, payload)
+      .then(() => loadAdminData(
+        decision === 'reject' ? 'Propuesta rechazada; el equipo podrá verla junto al motivo.' :
+          decision === 'reschedule' ? 'Visita reprogramada y aprobada.' : 'Visita aprobada y agregada a la agenda del equipo.'
+      ))
+      .catch((error) => { if (!handleSessionError(error)) showPortalAlert(error.message, true); })
+      .finally(() => setBusy(button, false));
+  }
+
+  function createEditControls(assignment) {
+    const wrapper = element('details', 'assignment-edit');
+    wrapper.append(element('summary', '', 'Editar o cancelar'));
+    const form = element('form', 'edit-form');
+    form.dataset.assignmentId = assignment.id;
+    const dateLabel = element('label', '', 'Fecha');
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.name = 'date';
+    dateInput.required = true;
+    dateInput.value = assignment.date;
+    dateLabel.append(dateInput);
+    const collectorLabel = element('label', '', 'Aplicador/a');
+    const collectorSelect = document.createElement('select');
+    collectorSelect.name = 'collector';
+    collectorNames.forEach((name) => collectorSelect.add(new Option(name, name)));
+    collectorSelect.value = assignment.collector;
+    collectorLabel.append(collectorSelect);
+    const fieldset = element('fieldset', 'instrument-choices');
+    fieldset.append(element('legend', '', 'Pautas requeridas'));
+    INSTRUMENTS.forEach((instrument) => {
+      const label = document.createElement('label');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = instrument.id;
+      checkbox.checked = assignment.statuses[instrument.id].required;
+      label.append(checkbox, document.createTextNode(` ${instrument.label}`));
+      fieldset.append(label);
+    });
+    const error = element('p', 'form-message error');
+    error.hidden = true;
+    const submit = element('button', 'primary-button', 'Guardar cambios');
+    submit.type = 'submit';
+    form.append(dateLabel, collectorLabel, fieldset, error, submit);
+    form.addEventListener('submit', saveAdminAssignment);
+
+    const cancelDetails = element('details', 'cancel-controls');
+    cancelDetails.append(element('summary', '', 'Cancelar esta asignación'));
+    const cancelForm = element('form', 'cancel-form');
+    cancelForm.dataset.assignmentId = assignment.id;
+    const reasonLabel = element('label', '', 'Motivo de cancelación');
+    const reason = document.createElement('textarea');
+    reason.name = 'reason';
+    reason.required = true;
+    reason.maxLength = 300;
+    reason.rows = 2;
+    reasonLabel.append(reason);
+    const cancelError = element('p', 'form-message error');
+    cancelError.hidden = true;
+    const cancelButton = element('button', 'secondary-button cancel-button', 'Confirmar cancelación');
+    cancelButton.type = 'submit';
+    cancelForm.append(reasonLabel, cancelError, cancelButton);
+    cancelForm.addEventListener('submit', cancelAdminAssignment);
+    cancelDetails.append(cancelForm);
+    wrapper.append(form, cancelDetails);
+    return wrapper;
+  }
+
+  function submitWithForm(event, functionName, payload, busyLabel, successMessage) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = $('button[type="submit"]', form);
+    const error = $('.form-message', form);
+    error.hidden = true;
+    setBusy(button, true, busyLabel);
+    runServer(functionName, currentSession.token, payload(form))
+      .then((result) => loadAdminData(typeof successMessage === 'function' ? successMessage(result) : successMessage))
+      .catch((failure) => {
+        if (handleSessionError(failure)) return;
+        error.textContent = failure.message;
+        error.hidden = false;
+      })
+      .finally(() => setBusy(button, false));
+  }
+
+  function saveAdminAssignment(event) {
+    submitWithForm(event, 'apiUpdateAssignment', (form) => ({
+      assignmentId: form.dataset.assignmentId,
+      date: $('input[name="date"]', form).value,
+      collector: $('select[name="collector"]', form).value,
+      instruments: [...form.querySelectorAll('.instrument-choices input:checked')].map((input) => input.value),
+    }), 'Guardando…', 'Asignación actualizada.');
+  }
+
+  function cancelAdminAssignment(event) {
+    submitWithForm(event, 'apiCancelAssignment', (form) => ({
+      assignmentId: form.dataset.assignmentId,
+      reason: $('textarea[name="reason"]', form).value.trim(),
+    }), 'Cancelando…', 'Asignación cancelada; el registro se conserva en la bitácora.');
+  }
+
+  function createAssignment(event) {
+    submitWithForm(event, 'apiCreateAssignment', (form) => ({
+      date: $('#adminDate').value,
+      localCode: $('#assignmentLocal').value,
+      collector: $('#assignmentCollector').value,
+      instruments: [...form.querySelectorAll('.instrument-choices input:checked')].map((input) => input.value),
+      confirmedLocation: $('#confirmedLocation').checked,
+    }), 'Asignando…', (result) => {
+      $('#assignmentForm').reset();
+      return `${result.localName} quedó asignado/a a ${result.collector}.`;
+    });
+  }
+
+  function saveDigestEmail(event) {
+    submitWithForm(event, 'apiSaveAdminDigestEmail', (form) => $('#digestEmail').value.trim(),
+      'Guardando…', (result) => result.enabled
+        ? 'Correo guardado. Ejecuta setupDailyProposalDigest() en el editor Apps Script para autorizar e instalar el resumen.'
+        : 'Resumen diario desactivado.');
+  }
+
+  // ---------- Admin: team access ----------
+  function renderAccess(access) {
+    if (!access) return;
+    $('#accountStatus').textContent = `${access.accountsConfigured} de ${access.accountCount} cuentas preparadas`;
+    $('#accountStatus').classList.toggle('error', access.accountsConfigured !== access.accountCount);
+    const link = $('#collectorUrl');
+    link.textContent = access.collectorUrl || 'Agrega ?view=collector al final de la URL /exec';
+    if (access.collectorUrl) link.href = access.collectorUrl;
+    else link.removeAttribute('href');
+    const email = $('#digestEmail');
+    if (email && document.activeElement !== email) email.value = access.digestEmail || '';
+    $('#digestStatus').textContent = access.digestTriggerInstalled
+      ? `Resumen diario activo a las 08:00${access.digestEmail ? ` · destinatario: ${access.digestEmail}` : ' · falta configurar el correo'}.`
+      : 'Resumen diario aún no activado. Guarda el correo y ejecuta setupDailyProposalDigest() en el editor Apps Script.';
+  }
+
+  function revokeTeamSessions() {
+    if (!window.confirm('¿Cerrar todas las sesiones activas de las cuentas del equipo? Tendrán que ingresar nuevamente.')) return;
+    const button = $('#revokeAccessButton');
+    setBusy(button, true, 'Cerrando sesiones…');
+    runServer('apiRevokeCollectorAccess', currentSession.token)
+      .then((result) => showPortalAlert(`Se cerraron ${result.revoked} sesiones activas del equipo.`, false))
+      .catch((error) => { if (!handleSessionError(error)) showPortalAlert(error.message, true); })
+      .finally(() => setBusy(button, false));
+  }
+
+  // ---------- Collector: workspace ----------
+  function loadWorkspace(message) {
+    const list = $('#collectorLocals');
+    showLoadingList(list);
+    showLoadingList($('#collectorAssignments'));
+    showLoadingList($('#collectorProposals'));
+    return runServer('apiGetCollectorWorkspace', currentSession.token, collectorProfile, $('#collectorDate').value)
+      .then((data) => {
+        if (!data || !Array.isArray(data.portfolio)) throw new Error('El servidor no devolvió tu cartera. Intenta otra vez.');
+        workspace = data;
+        $('#captureLink').href = data.capture.url || '#';
+        $('#captureLink').hidden = !data.capture.url;
+        renderCollectorLocals();
+        renderLocalPanel();
+        renderCollectorAssignments(data.assignments);
+        renderCollectorProposals(data.proposals || []);
+        if (!data.capture.available) showPortalAlert(`Tus locales se cargaron, pero no se pudo leer la captura: ${data.capture.message}`, true);
+        else showPortalAlert(typeof message === 'string' ? message : '', false);
+      })
+      .catch((error) => {
+        if (handleSessionError(error)) return;
+        addEmptyState(list, 'No fue posible cargar tus locales.');
+        addEmptyState($('#collectorAssignments'), 'No fue posible cargar tus tareas.');
+        addEmptyState($('#collectorProposals'), 'No fue posible cargar tus propuestas.');
+        showPortalAlert(error.message, true);
+      });
+  }
+
+  function renderCollectorLocals() {
+    const list = $('#collectorLocals');
+    const portfolio = workspace.portfolio;
+    const counts = computeStateCounts(portfolio);
+    $('#collectorPortfolioCount').textContent = `${portfolio.length} ${portfolio.length === 1 ? 'local a tu cargo' : 'locales a tu cargo'} · ${counts.no_applied} sin pautas aplicadas · ${counts.pending_any} con pautas pendientes${counts.closed_or_rejected ? ` · ${counts.closed_or_rejected} cerrado/rechazo` : ''}`;
+    const stateSelect = $('#collectorStateFilter');
+    if (stateSelect) {
+      const current = stateSelect.value;
+      stateSelect.replaceChildren(...buildStateFilterOptions(portfolio, 'Todos mis locales'));
+      stateSelect.value = current;
+    }
+    const query = $('#collectorSearch').value.trim().toLocaleLowerCase('es');
+    const stateFilter = stateSelect ? stateSelect.value : '';
+    const items = portfolio.filter((item) => {
+      if (!matchesLocalStateFilter(item, stateFilter)) return false;
+      return !query || `${item.code} ${item.name} ${item.address} ${localFieldStatus(item)} ${item.fieldNote || ''}`.toLocaleLowerCase('es').includes(query);
+    });
+    if (!portfolio.length) {
+      addEmptyState(list, 'Aún no tienes locales asignados. Consulta a administración.');
+      return;
+    }
+    if (!items.length) {
+      addEmptyState(list, 'No hay locales con estos filtros.');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    items.forEach((item) => {
+      const status = localFieldStatus(item);
+      const button = element('button', `local-choice${status === 'Cerrado' ? ' is-closed' : status === 'Rechazo' ? ' is-rejected' : ''}`);
+      button.type = 'button';
+      button.dataset.code = item.code;
+      button.setAttribute('aria-pressed', String(item.code === selectedLocalCode));
+      const done = item.capture.requiredCount && item.capture.recordedCount >= item.capture.requiredCount;
+      const pending = pendingInstrumentLabels(item);
+      const progressText = status !== 'Operativo'
+        ? `${status}${item.fieldNote ? `: ${item.fieldNote}` : ''} · ${captureSummary(item)}`
+        : (item.capture.recordedCount > 0 && pending.length
+          ? `${captureSummary(item)} · Faltan: ${pending.join(', ')}`
+          : captureSummary(item));
+      button.append(
+        element('strong', '', `${item.code} · ${item.name}`),
+        element('span', 'choice-meta', item.address || 'Dirección no registrada'),
+        element('span', `choice-progress${done ? ' is-done' : status !== 'Operativo' ? ' is-incident' : ''}`, progressText)
+      );
+      fragment.append(button);
+    });
+    list.replaceChildren(fragment);
+  }
+
+  function renderLocalPanel() {
+    const panel = $('#localPanel');
+    const item = workspace && workspace.portfolio.find((entry) => entry.code === selectedLocalCode);
+    if (!item) {
+      panel.replaceChildren(element('div', 'empty-state', 'Elige un local de tu lista para ver qué pautas debes completar.'));
+      return;
+    }
+    const heading = element('h3', '', `${item.code} · ${item.name}`);
+    heading.tabIndex = -1;
+    const capture = item.capture;
+    const history = capture.visits
+      ? `${capture.visits} ${capture.visits === 1 ? 'visita registrada' : 'visitas registradas'} · última ${capture.lastVisitDate || 'sin fecha'}${capture.lastCollector ? ` por ${capture.lastCollector}` : ''}`
+      : 'Aún no hay visitas registradas en la captura para este local.';
+    const list = element('ul', 'instrument-checklist');
+    INSTRUMENTS.forEach((instrument) => {
+      const state = capture.instruments[instrument.id];
+      const row = element('li', state.required ? 'is-required' : 'is-optional');
+      const detail = state.rows
+        ? `${state.rows} ${state.rows === 1 ? 'fila' : 'filas'} en ${state.visits} ${state.visits === 1 ? 'visita' : 'visitas'}`
+        : state.required ? 'Debes completarla en la captura' : 'No forma parte de este local';
+      row.append(
+        element('span', 'checklist-name', instrument.label),
+        element('span', 'checklist-detail', detail),
+        element('span', `state-chip ${stateClass(state.state)}`, state.state)
+      );
+      list.append(row);
+    });
+    panel.replaceChildren(
+      heading,
+      element('p', 'assignment-meta', item.address || 'Dirección no registrada'),
+      element('p', 'local-history', history),
+      list,
+      element('p', 'inline-help', 'El estado se calcula con lo guardado en la captura. Si acabas de enviar datos, usa «Actualizar».'),
+      createCollectorFieldStatusForm(item),
+      createVisitProposalForm(item)
+    );
+  }
+
+  function createCollectorFieldStatusForm(item) {
+    const wrapper = element('section', 'visit-proposal-form collector-field-status', '');
+    wrapper.append(element('h4', '', 'Condición del local en terreno (Cerrado o rechazo)'));
+    wrapper.append(element('p', 'inline-help', 'Si el local está cerrado o rechazan participar en el estudio, regístralo aquí para que quede identificado en el panel de administración.'));
+    const form = element('form', 'collector-proposal-form');
+    form.dataset.localCode = item.code;
+    const statusLabel = element('label', '', 'Condición observada');
+    const statusSelect = document.createElement('select');
+    statusSelect.name = 'fieldStatus';
+    [
+      ['Operativo', 'Operativo (disponible para encuesta)'],
+      ['Cerrado', 'Cerrado (sin atención o cerrado definitivo)'],
+      ['Rechazo', 'Rechazo (no desea participar)'],
+    ].forEach(([value, label]) => statusSelect.add(new Option(label, value)));
+    statusSelect.value = localFieldStatus(item);
+    statusLabel.append(statusSelect);
+
+    const noteLabel = element('label', '', 'Motivo u observación');
+    const noteInput = document.createElement('input');
+    noteInput.type = 'text';
+    noteInput.name = 'fieldNote';
+    noteInput.maxLength = 300;
+    noteInput.value = item.fieldNote || '';
+    noteInput.placeholder = 'Ej.: Cerrado definitivo / locatario no desea responder';
+    noteLabel.append(noteInput);
+
+    const error = element('p', 'form-message error');
+    error.hidden = true;
+    const button = element('button', 'secondary-button', 'Guardar condición del local');
+    button.type = 'submit';
+    form.append(statusLabel, noteLabel, error, button);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      savePortfolioFieldStatus(
+        [item.code],
+        statusSelect.value,
+        noteInput.value.trim(),
+        button,
+        error
+      );
+    });
+    wrapper.append(form);
+    return wrapper;
+  }
+
+  function createVisitProposalForm(item) {
+    const wrapper = element('section', 'visit-proposal-form', '');
+    wrapper.append(element('h4', '', 'Proponer una visita'));
+    wrapper.append(element('p', 'inline-help', 'Administración debe aprobar la fecha antes de que aparezca en tus tareas. Las pautas se toman de la cartera.'));
+    const form = element('form', 'collector-proposal-form');
+    form.dataset.localCode = item.code;
+    const dateLabel = element('label', '', 'Fecha propuesta');
+    const date = document.createElement('input');
+    date.type = 'date';
+    date.name = 'date';
+    date.min = localToday();
+    date.value = $('#collectorDate').value >= localToday() ? $('#collectorDate').value : localToday();
+    date.required = true;
+    dateLabel.append(date);
+    const timeLabel = element('label', '', 'Hora aproximada (opcional)');
+    const time = document.createElement('input');
+    time.type = 'time';
+    time.name = 'time';
+    timeLabel.append(time);
+    const noteLabel = element('label', '', 'Nota para coordinación (opcional)');
+    const note = document.createElement('textarea');
+    note.name = 'note';
+    note.maxLength = 300;
+    note.rows = 2;
+    note.placeholder = 'Por ejemplo, horario acordado con el local';
+    noteLabel.append(note);
+    const instruments = item.requiredInstruments.map((id) => INSTRUMENTS.find((instrument) => instrument.id === id)?.label)
+      .filter(Boolean).join(', ');
+    form.append(dateLabel, timeLabel, noteLabel,
+      element('p', 'proposal-instruments', `Pautas incluidas: ${instruments || 'sin pautas configuradas'}`));
+    const error = element('p', 'form-message error');
+    error.hidden = true;
+    const button = element('button', 'primary-button', 'Enviar propuesta a administración');
+    button.type = 'submit';
+    form.append(error, button);
+    form.addEventListener('submit', submitVisitProposal);
+    wrapper.append(form);
+    return wrapper;
+  }
+
+  function submitVisitProposal(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = $('button[type="submit"]', form);
+    const error = $('.form-message', form);
+    error.hidden = true;
+    setBusy(button, true, 'Enviando…');
+    runServer('apiCreateVisitProposal', currentSession.token, collectorProfile, {
+      localCode: form.dataset.localCode,
+      date: $('input[name="date"]', form).value,
+      time: $('input[name="time"]', form).value,
+      note: $('textarea[name="note"]', form).value.trim(),
+    })
+      .then(() => loadWorkspace('Propuesta enviada a administración para revisión.'))
+      .catch((failure) => {
+        if (handleSessionError(failure)) return;
+        error.textContent = failure.message;
+        error.hidden = false;
+      })
+      .finally(() => setBusy(button, false));
+  }
+
+  function selectCollectorLocal(event) {
+    const button = event.target.closest('.local-choice');
+    if (!button) return;
+    selectedLocalCode = button.dataset.code;
+    renderCollectorLocals();
+    renderLocalPanel();
+    const heading = $('#localPanel h3');
+    if (heading) {
+      heading.focus({ preventScroll: true });
+      if (window.matchMedia('(max-width: 720px)').matches) $('#localPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function renderCollectorAssignments(assignments) {
+    const container = $('#collectorAssignments');
+    $('#collectorCount').textContent = `${assignments.length} ${assignments.length === 1 ? 'tarea programada' : 'tareas programadas'} para esta fecha`;
+    if (!assignments.length) {
+      addEmptyState(container, 'No tienes visitas programadas para esta fecha. Puedes avanzar con los locales de tu cartera.');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    assignments.forEach((assignment) => fragment.append(renderCollectorCard(assignment)));
+    container.replaceChildren(fragment);
+  }
+
+  function renderCollectorProposals(proposals) {
+    const container = $('#collectorProposals');
+    if (!proposals.length) {
+      addEmptyState(container, 'No tienes propuestas de visita.');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    proposals.forEach((proposal) => {
+      const row = element('article', 'assignment-row proposal-row');
+      row.append(
+        element('p', 'assignment-name', `${proposal.date}${proposal.proposedTime ? ` · ${proposal.proposedTime}` : ''} · ${proposal.localCode} · ${proposal.localName}`),
+        element('p', 'assignment-meta', proposal.address || 'Dirección no registrada'),
+        element('span', `state-chip ${proposal.requestStatus === 'Rechazada' ? 'state-blocked' :
+          proposal.requestStatus === 'Aprobada' ? 'state-complete' : 'state-progress'}`,
+        proposal.requestStatus === 'Rechazada' ? 'Rechazada' :
+          proposal.requestStatus === 'Aprobada' ? 'Aprobada · revisa tu agenda' : 'Pendiente de aprobación')
+      );
+      if (proposal.requestNote) row.append(element('p', 'assignment-details', `Tu nota: ${proposal.requestNote}`));
+      if (proposal.responseReason) {
+        row.append(element('p', proposal.requestStatus === 'Rechazada' ? 'cancelled-label' : 'assignment-details',
+          `Respuesta de administración: ${proposal.responseReason}`));
+      }
+      fragment.append(row);
+    });
+    container.replaceChildren(fragment);
+  }
+
+  function renderCollectorCard(assignment) {
+    const card = element('article', 'collector-card');
+    card.append(
+      element('h3', '', `${assignment.localCode} · ${assignment.localName}`),
+      element('p', 'assignment-meta', assignment.address || 'Dirección no registrada')
+    );
+    if (assignment.locationAlert) card.append(element('p', 'location-note', `Nota territorial: ${assignment.locationAlert}`));
+    INSTRUMENTS.forEach((instrument) => {
+      const state = assignment.statuses[instrument.id];
+      if (!state.required) return;
+      const form = element('form', 'instrument-state');
+      form.dataset.assignmentId = assignment.id;
+      form.dataset.instrumentId = instrument.id;
+      const statusLabel = element('label', '', 'Estado');
+      const select = document.createElement('select');
+      select.setAttribute('aria-label', `Estado de ${instrument.label}`);
+      STATES.forEach((value) => select.add(new Option(value, value)));
+      select.value = state.status;
+      statusLabel.append(select);
+      const reasonLabel = element('label', '', 'Motivo (si aplica)');
+      const reason = document.createElement('input');
+      reason.type = 'text';
+      reason.maxLength = 300;
+      reason.value = state.reason;
+      reason.placeholder = 'Obligatorio para «No aplica» o «Bloqueado»';
+      reasonLabel.append(reason);
+      const save = element('button', 'primary-button state-save', 'Guardar estado');
+      save.type = 'submit';
+      form.append(element('strong', 'state-label', instrument.label), statusLabel, reasonLabel, save);
+      form.addEventListener('submit', saveInstrumentStatus);
+      card.append(form);
+    });
+    return card;
+  }
+
+  function saveInstrumentStatus(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = $('.state-save', form);
+    setBusy(button, true, 'Guardando…');
+    runServer('apiUpdateInstrumentStatus', currentSession.token, {
+      collector: collectorProfile,
+      assignmentId: form.dataset.assignmentId,
+      instrumentId: form.dataset.instrumentId,
+      status: $('select', form).value,
+      reason: $('input', form).value.trim(),
+    })
+      .then(() => loadWorkspace('Estado guardado.'))
+      .catch((error) => { if (!handleSessionError(error)) showPortalAlert(error.message, true); })
+      .finally(() => setBusy(button, false));
+  }
+
+  // ---------- Bindings ----------
+  const bind = (selector, eventName, handler) => {
+    const target = $(selector);
+    if (target) target.addEventListener(eventName, handler);
+  };
+
+  function researchMessage(root, message, isError) {
+    root.textContent = message;
+    root.classList.toggle('error', Boolean(isError));
+    root.hidden = false;
+  }
+
+  function studentMetadata(form) {
+    return {
+      participantCode: form.elements.participantCode.value.trim(),
+      date: form.elements.date.value,
+      entryYear: form.elements.entryYear.value,
+      career: form.elements.career.value.trim(),
+      sex: form.elements.sex.value,
+      consent: form.elements.consent.checked,
+    };
+  }
+
+  function loadStudentInstrumentStatus() {
+    const fields = $('#studentResearchFields');
+    fields.disabled = true;
+    runServer('apiStudentInstrumentStatus', currentSession.token)
+      .then((result) => {
+        fields.disabled = !result.validated;
+        $('#studentInstrumentStatus').textContent = result.validated
+          ? `Instrumento habilitado · versión ${result.version}.`
+          : `Borrador ${result.version}: respuestas y carga de archivos bloqueadas hasta su validación.`;
+      })
+      .catch((error) => {
+        if (!handleSessionError(error)) $('#studentInstrumentStatus').textContent = `No se pudo consultar el estado: ${error.message}`;
+      });
+  }
+
+  function saveResearchNote(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = $('button[type="submit"]', form);
+    const message = $('.form-message', form);
+    setBusy(button, true, 'Guardando…');
+    runServer('apiSaveResearchNote', currentSession.token, {
+      category: form.elements.category.value,
+      note: form.elements.note.value.trim(),
+    }).then((result) => {
+      form.reset();
+      researchMessage(message, result, false);
+    }).catch((error) => {
+      if (!handleSessionError(error)) researchMessage(message, error.message, true);
+    }).finally(() => setBusy(button, false));
+  }
+
+  function submitStudentSurvey() {
+    const form = $('#studentResearchForm');
+    if (!form.reportValidity()) return;
+    const button = $('#saveStudentSurvey');
+    const message = $('#studentResearchMessage');
+    const payload = Object.assign(studentMetadata(form), {
+      budget: form.elements.budget.value,
+      purchase: form.elements.purchase.value,
+      interest: form.elements.interest.value,
+      barriers: form.elements.barriers.value,
+      comments: form.elements.comments.value,
+    });
+    setBusy(button, true, 'Guardando…');
+    runServer('apiSaveStudentSurvey', currentSession.token, payload)
+      .then((result) => { form.reset(); researchMessage(message, result, false); })
+      .catch((error) => { if (!handleSessionError(error)) researchMessage(message, error.message, true); })
+      .finally(() => setBusy(button, false));
+  }
+
+  function uploadStudentTranscript() {
+    const form = $('#studentResearchForm');
+    if (!form.reportValidity()) return;
+    const file = form.elements.transcript.files[0];
+    const message = $('#studentResearchMessage');
+    if (!file || file.size === 0 || file.size > 3145728) {
+      researchMessage(message, 'Selecciona un archivo de hasta 3 MB.', true);
+      return;
+    }
+    const extension = file.name.split('.').pop().toLowerCase();
+    if (!['txt', 'pdf', 'docx'].includes(extension)) {
+      researchMessage(message, 'Selecciona un archivo TXT, PDF o DOCX.', true);
+      return;
+    }
+    if (!form.elements.language.value.trim() || !form.elements.interviewType.value || !form.elements.anonymized.checked) {
+      researchMessage(message, 'Completa el idioma, el tipo de entrevista y la confirmación de desidentificación.', true);
+      return;
+    }
+    const button = $('#uploadStudentTranscript');
+    const token = currentSession.token;
+    const payload = Object.assign(studentMetadata(form), {
+      language: form.elements.language.value.trim(),
+      interviewType: form.elements.interviewType.value,
+      anonymized: form.elements.anonymized.checked,
+      extension,
+    });
+    setBusy(button, true, 'Cargando…');
+    const reader = new FileReader();
+    reader.onerror = () => {
+      researchMessage(message, 'No se pudo leer el archivo. Intenta nuevamente.', true);
+      setBusy(button, false);
+    };
+    reader.onload = () => {
+      payload.base64 = String(reader.result).split(',')[1];
+      runServer('apiUploadStudentTranscript', token, payload)
+        .then((result) => { form.reset(); researchMessage(message, result, false); })
+        .catch((error) => { if (!handleSessionError(error)) researchMessage(message, error.message, true); })
+        .finally(() => setBusy(button, false));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function loadResearchRecords() {
+    const button = $('#loadResearchRecords');
+    const root = $('#researchRecords');
+    setBusy(button, true, 'Consultando…');
+    runServer('apiListResearchRecords', currentSession.token).then((data) => {
+      const notes = element('section', '');
+      notes.append(element('h3', '', 'Observaciones generales'));
+      if (!data.notes.length) notes.append(element('p', '', 'Sin observaciones registradas.'));
+      data.notes.forEach((row) => {
+        notes.append(element('p', '', `${row[0]} · ${row[1]} · ${row[2]}: ${row[3]}`));
+      });
+      const transcripts = element('section', '');
+      transcripts.append(element('h3', '', 'Transcripciones'));
+      if (!data.transcripts.length) transcripts.append(element('p', '', 'Sin transcripciones registradas.'));
+      data.transcripts.forEach((row) => {
+        const line = element('p', '', `${row[3]} · ${row[4]} · ${row[5]} · ${row[6]} · ${row[7]} · ${row[8]} · ${row[9]} `);
+        if (/^[A-Za-z0-9_-]+$/.test(row[10])) {
+          const link = element('a', '', 'Abrir documento');
+          link.href = 'https:/' + '/drive.google.com/open?id=' + encodeURIComponent(row[10]);
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          line.append(link);
+        } else {
+          line.append(document.createTextNode('ID de documento inválido.'));
+        }
+        transcripts.append(line);
+      });
+      root.replaceChildren(notes, transcripts);
+    }).catch((error) => {
+      if (!handleSessionError(error)) root.replaceChildren(element('p', 'form-message error', error.message));
+    }).finally(() => setBusy(button, false));
+  }
+
+  bind('#loginForm', 'submit', (event) => {
+    event.preventDefault();
+    const button = $('#loginButton');
+    const email = $('#loginEmail');
+    const credential = $('#credential');
+    showLoginError('');
+    setBusy(button, true, 'Verificando…');
+    runServer('apiLogin', PAGE_ROLE, email.value, credential.value)
+      .then((session) => {
+        credential.value = '';
+        enterPortal(session);
+      })
+      .catch((error) => showLoginError(error.message))
+      .finally(() => setBusy(button, false));
+  });
+  bind('#passwordChangeForm', 'submit', submitPasswordChange);
+  bind('#resetRequestForm', 'submit', requestPasswordReset);
+  bind('#resetCompleteForm', 'submit', completePasswordReset);
+  bind('#forgotPasswordLink', 'click', openPasswordReset);
+  bind('#backToLogin', 'click', returnToLogin);
+  document.querySelectorAll('[data-toggle-password]').forEach((button) => {
+    button.addEventListener('click', togglePasswordVisibility);
+  });
+  bind('#changePassword', 'input', (event) => updatePasswordRules(event.currentTarget.value, $('#passwordRules')));
+  bind('#resetPassword', 'input', (event) => updatePasswordRules(event.currentTarget.value, $('#resetPasswordRules')));
+  document.querySelectorAll('.logout-button').forEach((button) => button.addEventListener('click', logout));
+
+  if (PAGE_ROLE === 'admin') {
+    bindBoard();
+    bind('#loadResearchRecords', 'click', loadResearchRecords);
+    bind('#createCollectorForm', 'submit', (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const status = $('#createCollectorStatus');
+      const button = $('#createCollectorButton');
+      status.hidden = true;
+      setBusy(button, true, 'Creando y enviando…');
+      runServer('apiCreateCollector', currentSession.token, {
+        name: $('#collectorAccountName').value,
+        email: $('#collectorAccountEmail').value,
+      }).then((result) => {
+        form.reset();
+        status.classList.remove('error');
+        status.textContent = `Acceso creado y enviado a ${result.email}.`;
+        status.hidden = false;
+        return loadAdminData();
+      }).catch((error) => {
+        if (handleSessionError(error)) return;
+        status.classList.add('error');
+        status.textContent = error.message;
+        status.hidden = false;
+      }).finally(() => setBusy(button, false));
+    });
+    bind('#assignmentForm', 'submit', createAssignment);
+    bind('#localSearch', 'input', updateLocalOptions);
+    bind('#localCategoryFilter', 'change', updateLocalOptions);
+    bind('#localStateFilter', 'change', updateLocalOptions);
+    bind('#assignmentLocal', 'change', describeSelectedLocal);
+    bind('#adminDate', 'change', () => loadAdminData());
+    bind('#refreshAdmin', 'click', () => loadAdminData());
+    bind('#syncConsolidatedButton', 'click', syncConsolidatedDecisions);
+    bind('#revokeAccessButton', 'click', revokeTeamSessions);
+    bind('#digestEmailForm', 'submit', saveDigestEmail);
+  } else {
+    bind('#researchNoteForm', 'submit', saveResearchNote);
+    bind('#studentResearch', 'toggle', (event) => {
+      if (event.currentTarget.open) loadStudentInstrumentStatus();
+    });
+    bind('#saveStudentSurvey', 'click', submitStudentSurvey);
+    bind('#uploadStudentTranscript', 'click', uploadStudentTranscript);
+    bind('#collectorLocals', 'click', selectCollectorLocal);
+    bind('#collectorSearch', 'input', () => { if (workspace) renderCollectorLocals(); });
+    bind('#collectorStateFilter', 'change', () => { if (workspace) renderCollectorLocals(); });
+    bind('#collectorDate', 'change', () => loadWorkspace());
+    bind('#refreshCollector', 'click', () => loadWorkspace('Datos actualizados.'));
+  }
+
+  setDefaultDates();
+  try {
+    const saved = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+    if (saved && saved.token && Date.parse(saved.expiresAt) > Date.now()) enterPortal(saved);
+    else if (saved) {
+      localStorage.removeItem(TOKEN_KEY);
+      showLoginError('La sesión de este dispositivo venció. Ingresa nuevamente.');
+    }
+  } catch (error) {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+</script>

@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1f5a48">
+    <meta name="description" content="Portal ESPORA para que cada aplicador vea sus locales y las pautas pendientes.">
+    <title>ESPORA · Mis tareas</title>
+    <?!= include('Styles'); ?>
+  </head>
+  <body data-portal-role="collector">
+    <main class="shell">
+      <header class="masthead">
+        <a class="brand" href="#" aria-label="ESPORA, mis tareas">
+          <span class="brand-mark" aria-hidden="true">E</span>
+          <span><strong>ESPORA</strong><small>Mis tareas de terreno</small></span>
+        </a>
+        <span id="sessionBadge" class="session-badge" hidden></span>
+      </header>
+
+      <section id="loginView" class="login-layout" aria-labelledby="loginTitle">
+        <div class="login-intro">
+          <h1 id="loginTitle">Tus locales y tus pautas, en un solo lugar.</h1>
+          <p>Ingresa con tu correo personal. Verás únicamente los locales y las visitas asignadas a tu cuenta.</p>
+        </div>
+        <form id="loginForm" class="login-form">
+          <h2>Ingresar</h2>
+          <label for="loginEmail">Correo de tu cuenta</label>
+          <input id="loginEmail" name="email" type="email" autocomplete="username" maxlength="254" required>
+          <label for="credential">Clave de acceso</label>
+          <div class="password-field"><input id="credential" name="password" type="password" autocomplete="current-password" required><button class="password-toggle" type="button" data-toggle-password="credential" aria-label="Mostrar clave">Mostrar</button></div>
+          <p class="form-help">La primera vez, usa la clave temporal que te entregó administración. Después crearás una clave personal.</p>
+          <p id="loginError" class="form-message error" role="alert" hidden></p>
+          <button class="primary-button" id="loginButton" type="submit">Entrar</button>
+          <button class="text-button" id="forgotPasswordLink" type="button">¿Olvidaste tu clave?</button>
+        </form>
+      </section>
+
+      <section id="passwordChangeView" class="credential-stage" aria-labelledby="passwordChangeTitle" hidden>
+        <form id="passwordChangeForm" class="login-form credential-form">
+          <h1 id="passwordChangeTitle">Crea tu clave personal</h1>
+          <p>La clave temporal solo sirve para este primer ingreso. Elige una clave nueva que no hayas usado en otra cuenta.</p>
+          <label for="changePassword">Nueva clave</label>
+          <div class="password-field"><input id="changePassword" type="password" autocomplete="new-password" minlength="12" required><button class="password-toggle" type="button" data-toggle-password="changePassword" aria-label="Mostrar clave">Mostrar</button></div>
+          <ul id="passwordRules" class="password-rules" aria-live="polite">
+            <li data-rule="length">Al menos 12 caracteres</li><li data-rule="letter">Incluye una letra</li>
+            <li data-rule="number">Incluye un número</li><li data-rule="special">Incluye un carácter especial</li>
+          </ul>
+          <label for="changePasswordConfirm">Repite la nueva clave</label>
+          <div class="password-field"><input id="changePasswordConfirm" type="password" autocomplete="new-password" minlength="12" required><button class="password-toggle" type="button" data-toggle-password="changePasswordConfirm" aria-label="Mostrar confirmación">Mostrar</button></div>
+          <p class="form-help">Puedes usar un gestor de contraseñas. Comprueba que ambas claves coincidan antes de guardar.</p>
+          <p id="passwordChangeError" class="form-message error" role="alert" hidden></p>
+          <button id="changePasswordButton" class="primary-button" type="submit">Guardar clave personal</button>
+          <button class="quiet-button logout-button" type="button">Cerrar sesión</button>
+        </form>
+      </section>
+
+      <section id="resetView" class="credential-stage" aria-labelledby="resetTitle" hidden>
+        <div class="login-form credential-form">
+          <h1 id="resetTitle">Recupera tu acceso</h1>
+          <p>Solicita un código de un solo uso al correo de tu cuenta. Vence en 10 minutos.</p>
+          <form id="resetRequestForm">
+            <label for="resetEmail">Correo asociado a ESPORA</label>
+            <input id="resetEmail" type="email" autocomplete="email" maxlength="254" required>
+            <p id="resetRequestMessage" class="form-message" role="status" aria-live="polite" hidden></p>
+            <button id="resetRequestButton" class="secondary-button" type="submit">Enviar código de recuperación</button>
+          </form>
+          <form id="resetCompleteForm" class="reset-complete-form">
+            <label for="resetCode">Código de recuperación</label>
+            <input id="resetCode" type="text" inputmode="text" autocomplete="one-time-code" maxlength="12" autocapitalize="characters" required>
+            <label for="resetPassword">Nueva clave personal</label>
+            <div class="password-field"><input id="resetPassword" type="password" autocomplete="new-password" minlength="12" required><button class="password-toggle" type="button" data-toggle-password="resetPassword" aria-label="Mostrar clave">Mostrar</button></div>
+            <ul id="resetPasswordRules" class="password-rules" aria-live="polite">
+              <li data-rule="length">Al menos 12 caracteres</li><li data-rule="letter">Incluye una letra</li>
+              <li data-rule="number">Incluye un número</li><li data-rule="special">Incluye un carácter especial</li>
+            </ul>
+            <label for="resetPasswordConfirm">Repite la nueva clave</label>
+            <div class="password-field"><input id="resetPasswordConfirm" type="password" autocomplete="new-password" minlength="12" required><button class="password-toggle" type="button" data-toggle-password="resetPasswordConfirm" aria-label="Mostrar confirmación">Mostrar</button></div>
+            <p id="resetError" class="form-message error" role="alert" hidden></p>
+            <button id="resetCompleteButton" class="primary-button" type="submit">Actualizar clave</button>
+          </form>
+          <button class="text-button" id="backToLogin" type="button">Volver al ingreso</button>
+        </div>
+      </section>
+
+      <section id="portalView" hidden>
+        <div id="portalAlert" class="notice" role="status" hidden></div>
+        <div class="page-heading">
+          <h1 id="collectorHeading">Mis locales</h1>
+          <div class="heading-actions">
+            <button class="quiet-button logout-button" type="button">Salir</button>
+          </div>
+        </div>
+
+        <div class="toolbar collector-toolbar">
+          <p id="collectorPortfolioCount" class="list-summary" aria-live="polite">Cargando…</p>
+          <a id="captureLink" class="secondary-button capture-link" href="#" target="_blank" rel="noopener" hidden>Abrir captura ESPORA ↗</a>
+          <button class="secondary-button" id="refreshCollector" type="button">Actualizar</button>
+        </div>
+
+        <section class="work-area" aria-labelledby="researchNotesTitle">
+          <h2 id="researchNotesTitle">Observaciones del estudio</h2>
+          <p>Registra observaciones generales de aplicación, adecuación o cuaderno de campo. No incluyas nombres ni datos identificatorios.</p>
+          <form id="researchNoteForm">
+            <label>Tipo de observación
+              <select name="category" required>
+                <option value="">Selecciona</option><option>Aplicación</option><option>Adecuación</option><option>Cuaderno de campo</option>
+              </select>
+            </label>
+            <label>Observación<textarea name="note" rows="3" maxlength="3000" required></textarea></label>
+            <button type="submit" class="secondary-button">Guardar observación</button>
+            <p class="form-message" role="status" aria-live="polite" hidden></p>
+          </form>
+        </section>
+
+        <details class="work-area" id="studentResearch">
+          <summary>Instrumento para estudiantes universitarios</summary>
+          <p id="studentInstrumentStatus" class="inline-help">Comprobando estado del instrumento…</p>
+          <p>Propuesta pendiente de validación. Usa códigos de participante; no ingreses nombres ni datos de contacto.</p>
+          <form id="studentResearchForm">
+            <fieldset id="studentResearchFields" disabled>
+              <legend>Datos de la aplicación</legend>
+              <label>Código de participante<input name="participantCode" maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" required></label>
+              <label>Fecha de aplicación o entrevista<input name="date" type="date" required></label>
+              <label>Año de ingreso a la universidad<input name="entryYear" type="number" min="1900" required></label>
+              <label>Carrera<input name="career" maxlength="150" required></label>
+              <label>Sexo<select name="sex" required><option value="">Selecciona</option><option>Femenino</option><option>Masculino</option><option>Otro</option><option>Prefiero no responder</option></select></label>
+              <label><input name="consent" type="checkbox" required> Confirmo que existe consentimiento para el uso de los datos.</label>
+
+              <h3>Preguntas propuestas: pendientes de validación</h3>
+              <label>¿Cuánto destinas mensualmente a alimentos? (CLP, opcional)<input name="budget" type="number" min="0" max="100000000" step="1"></label>
+              <label>¿Dónde compras alimentos habitualmente?
+                <select name="purchase"><option value="">Selecciona</option><option>Supermercado</option><option>Almacén</option><option>Feria o mercado</option><option>Otro</option><option>Prefiero no responder</option></select>
+              </label>
+              <label>¿Qué aspecto priorizas al elegir alimentos?
+                <select name="interest"><option value="">Selecciona</option><option>Precio</option><option>Calidad</option><option>Salud</option><option>Origen</option><option>Otro</option><option>Prefiero no responder</option></select>
+              </label>
+              <label>¿Qué dificultades encuentras para acceder a los alimentos que prefieres?<textarea name="barriers" rows="3" maxlength="3000"></textarea></label>
+              <label>¿Qué más quisieras contar sobre tu alimentación?<textarea name="comments" rows="3" maxlength="3000"></textarea></label>
+              <button type="button" class="primary-button" id="saveStudentSurvey">Guardar encuesta</button>
+
+              <h3>Transcripción de entrevista</h3>
+              <p>Solo archivos desidentificados y autorizados. No subas nombres en el archivo ni en su contenido. Máximo 3 MB; TXT, PDF o DOCX.</p>
+              <label>Idioma<input name="language" maxlength="80"></label>
+              <label>Tipo de entrevista<select name="interviewType"><option value="">Selecciona</option><option>Individual</option><option>Grupal</option></select></label>
+              <label>Transcripción<input name="transcript" type="file" accept=".txt,.pdf,.docx"></label>
+              <label><input name="anonymized" type="checkbox"> Confirmo que el documento está desidentificado.</label>
+              <button type="button" class="secondary-button" id="uploadStudentTranscript">Cargar transcripción</button>
+            </fieldset>
+            <p id="studentResearchMessage" class="form-message" role="status" aria-live="polite" hidden></p>
+          </form>
+        </details>
+
+        <div class="collector-workspace">
+          <section class="work-area" aria-labelledby="myLocalsTitle">
+            <div class="section-title"><h2 id="myLocalsTitle">Elige un local</h2></div>
+            <input id="collectorSearch" type="search" placeholder="Buscar por código, nombre o dirección" aria-label="Buscar en mis locales" autocomplete="off">
+            <select id="collectorStateFilter" class="collector-state-filter" aria-label="Filtrar mis locales por estado de pautas o terreno"><option value="">Todos mis locales</option></select>
+            <div id="collectorLocals" class="local-choices" aria-live="polite"></div>
+          </section>
+          <section class="work-area local-panel-area" aria-label="Pautas del local elegido">
+            <div id="localPanel" class="local-panel"></div>
+          </section>
+        </div>
+
+        <section class="work-area proposal-area" aria-labelledby="myProposalsTitle">
+          <div class="section-title">
+            <div><h2 id="myProposalsTitle">Mis propuestas de visita</h2><p>Administración debe aprobarlas antes de que aparezcan como tareas programadas.</p></div>
+          </div>
+          <div id="collectorProposals" class="assignment-list" aria-live="polite"></div>
+        </section>
+
+        <section class="work-area" aria-labelledby="scheduleTitle">
+          <div class="section-title">
+            <div><h2 id="scheduleTitle">Visitas programadas</h2><p id="collectorCount" aria-live="polite"></p></div>
+            <label class="date-field" for="collectorDate">Fecha<input id="collectorDate" type="date"></label>
+          </div>
+          <div id="collectorAssignments" class="assignment-list" aria-live="polite"></div>
+        </section>
+      </section>
+      <footer><span>ESPORA</span> · Economía Social, Precios, Orgánicos, Residuos y Alimentación</footer>
+    </main>
+    <?!= include('Client'); ?>
+  </body>
+</html>
