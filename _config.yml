@@ -1,0 +1,18 @@
+exclude:
+  - AGENTS.md
+  - data
+  - .github
+  - .impeccable
+  - apps-script
+  - apps-script-management
+  - reporte-evidencias
+  - BITACORA_CAMBIOS.md
+  - FLUJO_DATOS_Y_MAPEO.md
+  - MARCHA_BLANCA.md
+  - PRODUCT.md
+  - README.md
+  - carta-presentacion-investigacion-espora.md
+  - migracion-francisca-marcha-blanca.xlsx
+  - presentacion/generar_presentacion.py
+  - uv-boundaries.js
+  - uv-polygons.js

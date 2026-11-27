@@ -1,21 +1,12 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbyTbxjO3l-5y1X14Abk1CAd_vzO18lINngV1LJ4QwdiEuhbvKOfI_jS2_hWGId6ZiN9/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwpS5YJSoHiYLcHHVhdKXz1X17LBxG6n60Xk8x7TwX0D_wPeRtWdvnBN2JLTCLbGr_O/exec';
 const DRAFT_KEY = 'esporaNuevoEstudioVisitDraftV1';
 const QUEUE_KEY = 'esporaNuevoEstudioPendingV1';
 const NEW_LOCAL_COUNTER_KEY = 'esporaNuevoEstudioLocalCounterV1';
 const COLLECTOR_KEY = 'esporaNuevoEstudioCollectorV1';
 const NEW_LOCAL_CODE_PATTERN = /^LM\d+N([A-Z]{2,3}|\d+)$/i;
 const PRICE_UNITS = ['kg', '0,5 kg', 'Unidad', 'Otros'];
-const LEGACY_PRICE_PRODUCTS = [
-  { name: 'Pan marraqueta', category: 'Básicos de referencia', units: PRICE_UNITS },
-];
-const PRODUCTS = [
-  ['Lechuga costina', 'Comparables con ODEPA'], ['Papa de guarda', 'Comparables con ODEPA'], ['Tomate larga vida', 'Comparables con ODEPA'],
-  ['Zanahoria', 'Comparables con ODEPA'], ['Cebolla blanca', 'Comparables con ODEPA'], ['Manzana Fuji', 'Comparables con ODEPA'],
-  ['Arroz blanco grado 1', 'Básicos de referencia'], ['Lenteja', 'Básicos de referencia'], ['Leche entera pasteurizada de vaca', 'Básicos de referencia'], ['Pan hallulla', 'Básicos de referencia'],
-  ['Huevo blanco', 'Proteicos relevantes para Aysén'], ['Queso Gouda', 'Proteicos relevantes para Aysén'], ['Merluza austral', 'Proteicos relevantes para Aysén'],
-  ['Cordero (costillar o pulpa)', 'Proteicos relevantes para Aysén'],
-  ['Calafate (temporada)', 'Emblemáticos regionales'], ['Lechuga local (hidropónica o de productor local)', 'Emblemáticos regionales'], ['Miel regional', 'Emblemáticos regionales'],
-].map(([name, category]) => ({ name, category, units: PRICE_UNITS }));
+const LEGACY_PRICE_PRODUCTS = [];
+const PRODUCTS = [];
 
 const ORIGIN_CATEGORIES = [
   ['Productos hortícolas', ['Verduras y hortalizas frescas']],
@@ -460,110 +451,131 @@ function addPriceProduct(entry) {
   const empty = $('.price-product-empty', picker);
   const selected = $('.price-product-selected', picker);
   const products = [...PRODUCTS, ...LEGACY_PRICE_PRODUCTS.filter((legacy) => entry?.product === legacy.name)];
-  const groups = [...new Set(products.map((product) => product.category))];
-  const existingProducts = new Set(priceEntries_(getDraft()?.instruments.prices?.data).map((item) => item.product));
-  const pickerId = ++priceProductPickerId;
-  const radioName = `price-product-${pickerId}`;
-  let selectedGroup = '';
+  const freeEntry = products.length === 0;
   let productName = canonicalPriceProduct_(entry?.product || '');
   card.dataset.productName = productName;
-  const categoryButtons = new Map();
-  const renderOptions = () => {
-    const query = search.value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
-    const matches = products.filter((product) =>
-      (!selectedGroup || product.category === selectedGroup) &&
-      (!query || `${product.name} ${product.category}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().includes(query)));
-    optionList.replaceChildren();
-    empty.hidden = matches.length > 0;
-    matches.forEach((product) => {
-      const label = document.createElement('label');
-      label.className = 'price-product-option';
-      const radio = document.createElement('input');
-      radio.type = 'radio';
-      radio.name = radioName;
-      radio.value = product.name;
-      radio.required = true;
-      radio.checked = product.name === productName;
-      radio.disabled = existingProducts.has(product.name) && product.name !== productName;
-      label.classList.toggle('is-selected', radio.checked);
-      const name = document.createElement('span');
-      name.className = 'price-product-option-name';
-      name.textContent = product.name;
-      const detail = document.createElement('span');
-      detail.className = 'price-product-option-detail';
-      detail.textContent = existingProducts.has(product.name) && product.name !== productName
-        ? 'Ya agregado'
-        : product.category;
-      label.append(radio, name, detail);
-      optionList.append(label);
-      radio.addEventListener('change', () => {
-        if (productName && productName !== radio.value) {
-          const hasPriceDetails = [...card.querySelectorAll('.brand, .price-value, .notes')]
-            .some((field) => field.value.trim()) ||
-            [...card.querySelectorAll('.unit')].some((field) => field.value !== PRICE_UNITS[0]) ||
-            [...card.querySelectorAll('.promotion')].some((field) => field.value !== 'No');
-          if (hasPriceDetails && !window.confirm('Al cambiar el alimento, también se borrarán los precios y observaciones ingresados. ¿Quieres continuar?')) {
-            search.value = '';
-            selectedGroup = '';
-            categoryButtons.forEach((button, group) => button.setAttribute('aria-pressed', String(group === '')));
-            renderOptions();
-            return;
+  if (freeEntry) {
+    const freeFields = $('.price-free-fields', card);
+    const nameInput = $('.price-product-name', freeFields);
+    const groupInput = $('.price-product-group', freeFields);
+    picker.hidden = true;
+    freeFields.hidden = false;
+    $('.price-category-label', card).hidden = true;
+    nameInput.value = entry?.product || '';
+    groupInput.value = entry?.category || '';
+    const syncFreeEntry = () => {
+      productName = nameInput.value.trim();
+      card.dataset.productName = productName;
+      updatePriceStatus_(card);
+      card.querySelectorAll('.price-observation').forEach((row) => syncPriceNotes_(card, row));
+    };
+    nameInput.addEventListener('input', syncFreeEntry);
+    groupInput.addEventListener('input', syncFreeEntry);
+    syncFreeEntry();
+  } else {
+    const groups = [...new Set(products.map((product) => product.category))];
+    const existingProducts = new Set(priceEntries_(getDraft()?.instruments.prices?.data).map((item) => item.product));
+    const pickerId = ++priceProductPickerId;
+    const radioName = `price-product-${pickerId}`;
+    let selectedGroup = '';
+    const categoryButtons = new Map();
+    const renderOptions = () => {
+      const query = search.value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+      const matches = products.filter((product) =>
+        (!selectedGroup || product.category === selectedGroup) &&
+        (!query || `${product.name} ${product.category}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().includes(query)));
+      optionList.replaceChildren();
+      empty.hidden = matches.length > 0;
+      matches.forEach((product) => {
+        const label = document.createElement('label');
+        label.className = 'price-product-option';
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = radioName;
+        radio.value = product.name;
+        radio.required = true;
+        radio.checked = product.name === productName;
+        radio.disabled = existingProducts.has(product.name) && product.name !== productName;
+        label.classList.toggle('is-selected', radio.checked);
+        const name = document.createElement('span');
+        name.className = 'price-product-option-name';
+        name.textContent = product.name;
+        const detail = document.createElement('span');
+        detail.className = 'price-product-option-detail';
+        detail.textContent = existingProducts.has(product.name) && product.name !== productName
+          ? 'Ya agregado'
+          : product.category;
+        label.append(radio, name, detail);
+        optionList.append(label);
+        radio.addEventListener('change', () => {
+          if (productName && productName !== radio.value) {
+            const hasPriceDetails = [...card.querySelectorAll('.brand, .price-value, .notes')]
+              .some((field) => field.value.trim()) ||
+              [...card.querySelectorAll('.unit')].some((field) => field.value !== PRICE_UNITS[0]) ||
+              [...card.querySelectorAll('.promotion')].some((field) => field.value !== 'No');
+            if (hasPriceDetails && !window.confirm('Al cambiar el alimento, también se borrarán los precios y observaciones ingresados. ¿Quieres continuar?')) {
+              search.value = '';
+              selectedGroup = '';
+              categoryButtons.forEach((button, group) => button.setAttribute('aria-pressed', String(group === '')));
+              renderOptions();
+              return;
+            }
+            card.querySelectorAll('.brand, .price-value, .notes').forEach((field) => { field.value = ''; });
+            card.querySelectorAll('.unit').forEach((field) => { field.value = PRICE_UNITS[0]; });
+            card.querySelectorAll('.promotion').forEach((field) => { field.value = 'No'; });
+            $('.price-maximum-entry', card).open = false;
+            $('.price-status', card).value = 'precio_obtenido';
           }
-          card.querySelectorAll('.brand, .price-value, .notes').forEach((field) => { field.value = ''; });
-          card.querySelectorAll('.unit').forEach((field) => { field.value = PRICE_UNITS[0]; });
-          card.querySelectorAll('.promotion').forEach((field) => { field.value = 'No'; });
-          $('.price-maximum-entry', card).open = false;
-          $('.price-status', card).value = 'precio_obtenido';
-        }
-        productName = radio.value;
-        card.dataset.productName = productName;
-        optionList.querySelectorAll('.price-product-option').forEach((option) => option.classList.remove('is-selected'));
-        label.classList.add('is-selected');
-        $('.price-category', card).value = product.category;
-        $('.price-product-selected-name', selected).textContent = product.name;
-        const guidance = $('.price-guidance', card);
-        guidance.textContent = priceGuidance_(product);
-        guidance.hidden = !guidance.textContent;
-        selected.hidden = false;
-        picker.classList.add('has-selection');
-        search.value = '';
-        selectedGroup = '';
-        categoryButtons.forEach((button, group) => button.setAttribute('aria-pressed', String(group === '')));
-        renderOptions();
-        updatePriceStatus_(card);
-        card.querySelectorAll('.price-observation').forEach((row) => {
-          const notes = $('.notes', row);
-          const filled = row.dataset.kind === 'min' || $('.price-value', row).value !== '';
-          notes.required = filled &&
-            ($('.unit', row).value === 'Otros' || productName === 'Arroz blanco grado 1');
-          if (row.dataset.kind !== 'min') $('.brand', row).required = filled;
-          syncPriceNotes_(card, row);
+          productName = radio.value;
+          card.dataset.productName = productName;
+          optionList.querySelectorAll('.price-product-option').forEach((option) => option.classList.remove('is-selected'));
+          label.classList.add('is-selected');
+          $('.price-category', card).value = product.category;
+          $('.price-product-selected-name', selected).textContent = product.name;
+          const guidance = $('.price-guidance', card);
+          guidance.textContent = priceGuidance_(product);
+          guidance.hidden = !guidance.textContent;
+          selected.hidden = false;
+          picker.classList.add('has-selection');
+          search.value = '';
+          selectedGroup = '';
+          categoryButtons.forEach((button, group) => button.setAttribute('aria-pressed', String(group === '')));
+          renderOptions();
+          updatePriceStatus_(card);
+          card.querySelectorAll('.price-observation').forEach((row) => {
+            const notes = $('.notes', row);
+            const filled = row.dataset.kind === 'min' || $('.price-value', row).value !== '';
+            notes.required = filled &&
+              ($('.unit', row).value === 'Otros' || productName === 'Arroz blanco grado 1');
+            if (row.dataset.kind !== 'min') $('.brand', row).required = filled;
+            syncPriceNotes_(card, row);
+          });
         });
       });
+    };
+    const filterButton = (label, group) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'price-category-filter';
+      button.textContent = label;
+      button.setAttribute('aria-pressed', String(group === ''));
+      button.addEventListener('click', () => {
+        selectedGroup = group;
+        categoryButtons.forEach((item, key) => item.setAttribute('aria-pressed', String(key === group)));
+        renderOptions();
+      });
+      categoryButtons.set(group, button);
+      categoryFilters.append(button);
+    };
+    filterButton('Todos', '');
+    groups.forEach((group) => filterButton(group, group));
+    search.addEventListener('input', renderOptions);
+    $('.price-product-change', selected).addEventListener('click', () => {
+      picker.classList.remove('has-selection');
+      search.focus();
     });
-  };
-  const filterButton = (label, group) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'price-category-filter';
-    button.textContent = label;
-    button.setAttribute('aria-pressed', String(group === ''));
-    button.addEventListener('click', () => {
-      selectedGroup = group;
-      categoryButtons.forEach((item, key) => item.setAttribute('aria-pressed', String(key === group)));
-      renderOptions();
-    });
-    categoryButtons.set(group, button);
-    categoryFilters.append(button);
-  };
-  filterButton('Todos', '');
-  groups.forEach((group) => filterButton(group, group));
-  search.addEventListener('input', renderOptions);
-  $('.price-product-change', selected).addEventListener('click', () => {
-    picker.classList.remove('has-selection');
-    search.focus();
-  });
-  renderOptions();
+    renderOptions();
+  }
   const statusSelect = $('.price-status', card);
   statusSelect.value = entry?.status || 'precio_obtenido';
   statusSelect.addEventListener('change', () => updatePriceStatus_(card));
@@ -636,9 +648,13 @@ function priceData() {
   const entries = [...document.querySelectorAll('.product-card')].map((card) => {
     const product = priceProduct_(card);
     if (!product) throw new Error('Elige un alimento antes de guardar sus precios.');
+    const groupInput = $('.price-product-group', card);
+    const category = (groupInput ? groupInput.value : $('.price-category', card)?.value || '').trim();
+    if (groupInput && !category) throw new Error('Indica el grupo del producto antes de guardar sus precios.');
     const status = $('.price-status', card).value;
     return {
       product,
+      category,
       status,
       prices: status !== 'precio_obtenido' ? [] : [...card.querySelectorAll('.price-observation')]
       .filter((row) => row.dataset.kind === 'min' || $('.price-value', row).value !== '')
@@ -661,8 +677,9 @@ function canonicalPriceProduct_(name) {
 function priceEntries_(data) {
   const entries = data && !Array.isArray(data) ? data.products || [] : data || [];
   const allowed = new Set([...PRODUCTS, ...LEGACY_PRICE_PRODUCTS].map((product) => product.name));
+  const enforceCatalog = allowed.size > 0;
   const grouped = new Map();
-  entries.filter((entry) => allowed.has(canonicalPriceProduct_(entry.product)) ||
+  entries.filter((entry) => !enforceCatalog || allowed.has(canonicalPriceProduct_(entry.product)) ||
     ['Lenteja 6 mm', 'Merluza austral fresca', 'Merluza austral congelada'].includes(entry.product))
     .forEach((entry) => {
       const originalProduct = entry.product;
@@ -673,7 +690,7 @@ function priceEntries_(data) {
         ...price,
         notes: [oldType, price.notes].filter(Boolean).join(' '),
       }));
-      const group = grouped.get(product) || { product, status: entry.status || 'precio_obtenido', prices: [] };
+      const group = grouped.get(product) || { product, category: entry.category || '', status: entry.status || 'precio_obtenido', prices: [] };
       group.prices.push(...prices);
       group.legacyMerged = group.legacyMerged || originalProduct !== product;
       if (prices.length) group.status = 'precio_obtenido';

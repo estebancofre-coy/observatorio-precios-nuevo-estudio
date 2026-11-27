@@ -1,5 +1,6 @@
 :root { color: #183346; font-family: Arial, sans-serif; }
 #menuView .actions[hidden] { display: none; }
+label[hidden] { display: none; }
 body { background: #f3f7f4; margin: 0; }
 main { margin: auto; max-width: 1020px; padding: 24px; }
 .brand { align-items: center; display: flex; gap: 14px; margin-bottom: 18px; }

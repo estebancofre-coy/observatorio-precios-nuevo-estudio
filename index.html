@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1f5a48">
-  <meta name="description" content="ESPORA Coyhaique: Economia Social, Precios, Organicos, Residuos y Alimentacion.">
-  <meta property="og:title" content="ESPORA Coyhaique">
+  <meta name="description" content="ESPORA Región de Aysén: Economia Social, Precios, Organicos, Residuos y Alimentacion.">
+  <meta property="og:title" content="ESPORA Región de Aysén">
   <meta property="og:description" content="Economia Social, Precios, Organicos, Residuos y Alimentacion: un observatorio territorial que germina desde el compostaje y la Economia Social y Solidaria.">
-  <title>ESPORA Coyhaique | Levantamiento</title>
+  <title>ESPORA Región de Aysén | Levantamiento</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -16,7 +16,7 @@
       <div class="partner-logos">
         <img class="partner-logo logo-uaysen" src="assets/logo-uaysen.png" alt="Departamento de Ciencias Sociales y Humanidades, Universidad de Aysén" width="1000" height="378">
       </div>
-      <div class="brand-title"><img class="brand-spore" src="assets/espora-arbol-bosque.png" alt="" width="56" height="45"><div><h1>ESPORA Coyhaique</h1><p class="brand-strip">Economía Social · Precios · Orgánicos · Residuos · Alimentación</p></div></div>
+      <div class="brand-title"><img class="brand-spore" src="assets/espora-arbol-bosque.png" alt="" width="56" height="45"><div><h1>ESPORA Región de Aysén</h1><p class="brand-strip">Economía Social · Precios · Orgánicos · Residuos · Alimentación</p></div></div>
       <nav class="brand-actions" aria-label="Accesos de ESPORA">
         <details class="access-menu">
           <summary>ACCEDER <span aria-hidden="true">⌄</span></summary>
@@ -35,7 +35,7 @@
         <div class="hero-content">
           <p class="eyebrow">OBSERVATORIO TERRITORIAL DE ECONOMÍA SOCIAL Y ALIMENTACIÓN</p>
           <h2 id="heroTitle">ESPORA</h2>
-          <p class="hero-summary">Un estudio piloto en el contexto de la Universidad de Aysén para observar los comercios, alimentos y economías que dan forma a Coyhaique.</p>
+          <p class="hero-summary">Un estudio piloto en el contexto de la Universidad de Aysén para observar los comercios, alimentos y economías que dan forma a la Región de Aysén, en la Patagonia Chilena.</p>
           <div class="hero-actions">
             <a class="hero-action primary" href="#visitForm">Registrar un local nuevo <span aria-hidden="true">↓</span></a>
           </div>
@@ -43,7 +43,7 @@
             <span>Universidad de Aysén</span>
             <span>Estudio piloto</span>
             <span>Economía Social y Solidaria</span>
-            <span>Coyhaique, Aysén</span>
+            <span>Región de Aysén · Patagonia Chilena</span>
           </div>
         </div>
         <div class="hero-landscape" aria-hidden="true">
@@ -328,12 +328,12 @@
     </section>
 
     <template id="availabilityTemplate"><fieldset class="instrument-group"><legend></legend><div class="availability-rows"></div></fieldset></template>
-    <template id="priceProductTemplate"><article class="card product-card"><button class="remove-product" type="button">Quitar alimento</button><div class="grid"><fieldset class="price-product-picker wide"><legend class="required">Alimento centinela</legend><div class="price-product-selected" hidden><strong class="price-product-selected-name"></strong><button class="secondary price-product-change" type="button">Cambiar alimento</button></div><label class="price-search-label">Buscar alimento<input class="price-product-search" type="search" placeholder="Ej.: tomate" autocomplete="off"></label><div class="price-product-categories" role="group" aria-label="Filtrar alimentos por grupo"></div><div class="price-product-options" role="radiogroup" aria-label="Alimentos"></div><p class="price-product-empty" hidden>No encontramos alimentos con ese nombre. Prueba con otra palabra.</p></fieldset><label>Grupo<input class="price-category" readonly></label><p class="price-guidance wide" aria-live="polite" hidden></p><label class="required wide">Resultado del registro<select class="price-status" required><option value="precio_obtenido">Precio obtenido</option><option value="producto_no_disponible">Producto no disponible</option><option value="precio_no_obtenido">No fue posible obtener el precio</option></select><span class="field-help">¿Viste el alimento, pero no pudiste confirmar su precio? Elige «No fue posible obtener el precio».</span></label></div><div class="price-observations"></div></article></template>
+    <template id="priceProductTemplate"><article class="card product-card"><button class="remove-product" type="button">Quitar alimento</button><div class="grid"><fieldset class="price-product-picker wide"><legend class="required">Alimento centinela</legend><div class="price-product-selected" hidden><strong class="price-product-selected-name"></strong><button class="secondary price-product-change" type="button">Cambiar alimento</button></div><label class="price-search-label">Buscar alimento<input class="price-product-search" type="search" placeholder="Ej.: tomate" autocomplete="off"></label><div class="price-product-categories" role="group" aria-label="Filtrar alimentos por grupo"></div><div class="price-product-options" role="radiogroup" aria-label="Alimentos"></div><p class="price-product-empty" hidden>No encontramos alimentos con ese nombre. Prueba con otra palabra.</p></fieldset><fieldset class="price-free-fields wide" hidden><legend class="required">Producto</legend><div class="grid"><label class="required">Nombre del producto<input class="price-product-name" required placeholder="Ej.: bebida láctea saborizada"></label><label class="required">Grupo<input class="price-product-group" required placeholder="Ej.: Bebestibles"></label></div><p class="field-help">Escriba el nombre tal como aparece en el local y asígnele un grupo. Los productos y grupos definitivos se definirán con los resultados de las encuestas.</p></fieldset><label class="price-category-label">Grupo<input class="price-category" readonly></label><p class="price-guidance wide" aria-live="polite" hidden></p><label class="required wide">Resultado del registro<select class="price-status" required><option value="precio_obtenido">Precio obtenido</option><option value="producto_no_disponible">Producto no disponible</option><option value="precio_no_obtenido">No fue posible obtener el precio</option></select><span class="field-help">¿Viste el alimento, pero no pudiste confirmar su precio? Elige «No fue posible obtener el precio».</span></label></div><div class="price-observations"></div></article></template>
     <template id="priceObservationTemplate"><div class="price-observation"><p class="price-range-label">Precio <strong></strong></p><div class="grid"><label class="brand-field">Marca<input class="brand"></label><label class="price-field">Precio observado (CLP)<input class="price-value" type="number" min="0" step="1"></label><label class="unit-field">Unidad de medida<select class="unit"></select></label><label>¿Está en oferta?<select class="promotion"><option value="No">No</option><option value="Sí">Sí</option></select></label><label class="wide">Observaciones<textarea class="notes" placeholder="Obligatorio si la unidad es «Otros»: indique el formato."></textarea></label></div></div></template>
     <template id="originItemTemplate"><article class="card origin-item"><button class="remove-origin" type="button">Quitar producto</button><div class="grid"><fieldset class="origin-choice-picker"><legend class="required">Categoría alimentaria</legend><div class="origin-choice-summary" hidden><strong class="origin-choice-value"></strong><button class="secondary origin-choice-change" type="button">Cambiar</button></div><div class="origin-category-options origin-choice-options" role="radiogroup" aria-label="Categorías alimentarias"></div></fieldset><label class="required">Variedad del producto<input class="origin-variety" required placeholder="Ejemplo: frutilla"></label><label class="required">Comuna de origen declarada<select class="origin-commune" required></select></label><label>Sector o localidad específica<input class="origin-sector"></label><label>Marca o productor regional<input class="origin-brand"></label><fieldset class="origin-choice-picker"><legend class="required">¿Qué te confirmó el origen?</legend><div class="origin-choice-summary" hidden><strong class="origin-choice-value"></strong><button class="secondary origin-choice-change" type="button">Cambiar</button></div><div class="origin-source-options origin-choice-options" role="radiogroup" aria-label="Fuentes de origen"></div></fieldset><label class="wide">Observaciones<span class="field-help">Cuéntanos qué viste o quién te dio la información. Te pediremos este dato si no aparece la comuna o eliges «Otra».</span><textarea class="origin-notes" placeholder="Describe la evidencia de origen en Aysén."></textarea></label></div></article></template>
 
     <footer class="site-footer">
-      <p class="footer-brand"><strong>ESPORA Coyhaique</strong> · Economía Social, Precios, Orgánicos, Residuos y Alimentación</p>
+      <p class="footer-brand"><strong>ESPORA Región de Aysén</strong> · Economía Social, Precios, Orgánicos, Residuos y Alimentación · Patagonia Chilena</p>
       <div class="project-credits" aria-label="Créditos del proyecto">
         <p><strong>Ejecuta:</strong> Dr. Esteban Cofré Morales · Universidad de Aysén</p>
       </div>
