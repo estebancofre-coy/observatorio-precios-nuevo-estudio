@@ -44,7 +44,7 @@ const TRANSCRIPT_HEADERS = ['Fecha de registro', 'Aplicador', 'Versión', 'Códi
 
 const PORTAL_ACCOUNTS = [
   { slug: 'esteban', name: 'Esteban Cofré', email: 'esteban.cofre@uaysen.cl', role: 'admin' },
-  { slug: 'coordinadora', name: 'Coordinadora ESPORA', email: 'coordinadora@uaysen.cl', role: 'coordinator' },
+  { slug: 'coordinadora', name: 'Yinnia Uribe', email: 'yinnia.uribe@docentes.uaysen.cl', role: 'coordinator' },
 ];
 
 const MANAGEMENT_ROLES = ['admin', 'coordinator'];
