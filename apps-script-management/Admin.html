@@ -95,14 +95,14 @@
           <button class="quiet-button logout-button" type="button">Cerrar sesión</button>
         </div>
 
-        <details class="work-area">
+        <details class="work-area admin-only-section">
           <summary>Registros de investigación</summary>
           <p>Observaciones generales y metadatos de transcripciones. El acceso a los archivos depende también de los permisos de Google Drive.</p>
           <button type="button" class="secondary-button" id="loadResearchRecords">Consultar registros</button>
           <div id="researchRecords" aria-live="polite"></div>
         </details>
 
-        <section class="work-area" aria-labelledby="teamAccountsTitle">
+        <section class="work-area admin-only-section" aria-labelledby="teamAccountsTitle">
           <div class="section-title">
             <div>
               <h2 id="teamAccountsTitle">Crear acceso para aplicadores</h2>
@@ -293,7 +293,7 @@
           </section>
 
           <section id="fieldIncidentsPanel" class="field-incidents-panel" aria-labelledby="fieldIncidentsTitle">
-            <div id="consolidatedSyncBar" class="consolidated-sync-bar" hidden>
+            <div id="consolidatedSyncBar" class="consolidated-sync-bar admin-only-section" hidden>
               <div>
                 <strong>Consolidación de locales nuevos y decisiones manuales (corte 19/11)</strong>
                 <p id="consolidatedSyncStatus" class="inline-help"></p>
@@ -387,7 +387,7 @@
           </section>
         </div>
 
-        <section class="work-area access-area" aria-labelledby="accessTitle">
+        <section class="work-area access-area admin-only-section" aria-labelledby="accessTitle">
           <div class="section-title">
             <div><h2 id="accessTitle">Acceso del equipo</h2><p>Cada persona ingresa con su correo y clave individual. El primer acceso exige cambiar la clave temporal; la recuperación se envía al correo registrado.</p></div>
           </div>

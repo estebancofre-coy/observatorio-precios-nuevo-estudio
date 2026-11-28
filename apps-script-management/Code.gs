@@ -44,7 +44,23 @@ const TRANSCRIPT_HEADERS = ['Fecha de registro', 'Aplicador', 'Versión', 'Códi
 
 const PORTAL_ACCOUNTS = [
   { slug: 'esteban', name: 'Esteban Cofré', email: 'esteban.cofre@uaysen.cl', role: 'admin' },
+  { slug: 'coordinadora', name: 'Coordinadora ESPORA', email: 'coordinadora@uaysen.cl', role: 'coordinator' },
 ];
+
+const MANAGEMENT_ROLES = ['admin', 'coordinator'];
+
+function isManagementRole_(role) {
+  return MANAGEMENT_ROLES.indexOf(role) >= 0;
+}
+
+// Sesión de gestión: admin puede todo; coordinator opera cartera y visitas sin tocar cuentas, accesos ni consolidación.
+function requireManagementSession_(token, allowPasswordChange) {
+  const session = requireSession_(token, null, allowPasswordChange);
+  if (!isManagementRole_(session.role)) {
+    throw new Error('La sesión expiró o fue revocada. Ingresa nuevamente.');
+  }
+  return session;
+}
 
 function portalAccounts_() {
   const stored = PropertiesService.getScriptProperties().getProperty('ESPORA_COLLECTOR_ACCOUNTS');
@@ -268,10 +284,11 @@ function apiLogin(role, email, password) {
   const account = accountByEmail_(normalizedEmail);
   const failureKey = 'esporaLogin:' + hashSecret_(normalizedEmail).slice(0, 32);
   if (role !== 'admin' && role !== 'collector') throw new Error('Selecciona un tipo de acceso válido.');
+  const acceptedRoles = role === 'collector' ? ['collector'] : MANAGEMENT_ROLES;
   if (account) assertAccountNotLockedOut_(account);
   else assertNotLockedOut_(failureKey, LOGIN_FAILURE_LIMIT);
   const properties = PropertiesService.getScriptProperties();
-  const isConfigured = account && account.role === role;
+  const isConfigured = account && acceptedRoles.indexOf(account.role) >= 0;
   const salt = isConfigured
     ? properties.getProperty(accountProperty_(account, 'SALT'))
     : '';
@@ -592,7 +609,7 @@ function apiRevokeCollectorAccess(token) {
 
 function apiGetAdminData(token, date) {
   const selectedDate = validateDate_(date);
-  requireSession_(token, 'admin');
+  requireManagementSession_(token);
   const loaded = loadPortfolio_();
   const evidence = readCaptureEvidence_(loaded.locals);
   const localByCode = {};
@@ -684,7 +701,7 @@ function apiMovePortfolioLocals(token, payload) {
     throw new Error('Selecciona un aplicador activo o deja los locales sin asignar.');
   }
   return withScriptLock_(function () {
-    const session = requireSession_(token, 'admin');
+    const session = requireManagementSession_(token);
     const status = collector ? PORTFOLIO_MANUAL : PORTFOLIO_UNASSIGNED;
     const moved = updatePortfolioRows_(codes, function (row, headers) {
       const previous = String(row[headers['Aplicador/a permanente']] || '');
@@ -708,7 +725,7 @@ function apiUpdatePortfolioInstruments(token, payload) {
   const instruments = DEFAULT_REQUIRED_INSTRUMENTS.filter(function (id) { return selected.indexOf(id) >= 0; });
   if (!instruments.length) throw new Error('Cada local debe conservar al menos una pauta requerida.');
   return withScriptLock_(function () {
-    const session = requireSession_(token, 'admin');
+    const session = requireManagementSession_(token);
     updatePortfolioRows_(codes, function (row, headers) {
       row[headers['Instrumentos requeridos']] = JSON.stringify(instruments);
     }, session.name);
@@ -734,7 +751,7 @@ function apiUpdatePortfolioFieldStatus(token, payload) {
   const fieldNote = fieldStatus === 'Operativo' && !rawNote ? '' : rawNote;
   return withScriptLock_(function () {
     const session = requireSession_(token);
-    if (session.role !== 'admin' && session.role !== 'collector') {
+    if (!isManagementRole_(session.role) && session.role !== 'collector') {
       throw new Error('La sesión expiró o fue revocada. Ingresa nuevamente.');
     }
     if (session.role === 'collector') {
@@ -813,7 +830,7 @@ function apiCreateAssignment(token, payload) {
   if (!instruments.length) throw new Error('Selecciona al menos una pauta requerida para esta tarea.');
 
   return withScriptLock_(function () {
-    const session = requireSession_(token, 'admin');
+    const session = requireManagementSession_(token);
     const local = loadPortfolio_().locals.filter(function (item) { return item.code === localCode; })[0];
     if (!local) throw new Error('El local no aparece en la pestaña "Asignacion 107".');
     if (local.alert && request.confirmedLocation !== true) {
@@ -917,7 +934,7 @@ function apiRespondToVisitProposal(token, payload) {
   const time = decision === 'reschedule' ? validateProposedTime_(request.time) : '';
 
   return withScriptLock_(function () {
-    const session = requireSession_(token, 'admin');
+    const session = requireManagementSession_(token);
     const sheet = managedSheet_(ASSIGNMENTS_SHEET, SCHEDULE_HEADERS);
     const values = sheet.getDataRange().getValues();
     const headers = headerMap_(SCHEDULE_HEADERS);
@@ -1068,7 +1085,7 @@ function apiUpdateAssignment(token, payload) {
   if (!instruments.length) throw new Error('La asignación debe conservar al menos una pauta requerida.');
 
   return withScriptLock_(function () {
-    const session = requireSession_(token, 'admin');
+    const session = requireManagementSession_(token);
     const sheet = managedSheet_(ASSIGNMENTS_SHEET, SCHEDULE_HEADERS);
     const values = sheet.getDataRange().getValues();
     const headers = headerMap_(values[0]);
@@ -1135,7 +1152,7 @@ function apiCancelAssignment(token, payload) {
   if (!reason) throw new Error('Escribe el motivo de la cancelación.');
   if (reason.length > 300) throw new Error('El motivo debe tener 300 caracteres o menos.');
   return withScriptLock_(function () {
-    const session = requireSession_(token, 'admin');
+    const session = requireManagementSession_(token);
     const sheet = managedSheet_(ASSIGNMENTS_SHEET, SCHEDULE_HEADERS);
     const values = sheet.getDataRange().getValues();
     const headers = headerMap_(values[0]);

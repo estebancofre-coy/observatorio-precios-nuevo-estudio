@@ -371,6 +371,7 @@
     workspace = null;
     collectorProfile = '';
     localStorage.removeItem(TOKEN_KEY);
+    document.body.classList.remove('is-coordinator');
     $('#sessionBadge').hidden = true;
     $('#portalView').hidden = true;
     $('#passwordChangeView').hidden = true;
@@ -418,12 +419,14 @@
     $('#loginView').hidden = true;
     setDefaultDates();
     if (PAGE_ROLE === 'admin') {
-      if (session.role !== 'admin') {
+      if (session.role !== 'admin' && session.role !== 'coordinator') {
         clearSessionState('Esta sesión no corresponde a administración.');
         return;
       }
+      const coordinator = session.role === 'coordinator';
+      document.body.classList.toggle('is-coordinator', coordinator);
       $('#sessionBadge').hidden = false;
-      $('#sessionBadge').textContent = `${session.name} · Administración`;
+      $('#sessionBadge').textContent = `${session.name} · ${coordinator ? 'Coordinación' : 'Administración'}`;
       $('#portalView').hidden = false;
       loadAdminData();
       return;
