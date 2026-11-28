@@ -49,13 +49,15 @@ p, footer { color: #526a76; font-size: 13px; }
 .hero-action.secondary:hover { background: #fff; }
 .eyebrow { color: #14798a; font-size: 11px; font-weight: 700; letter-spacing: .11em; margin: 0; }
 .hero-artwork { align-self: stretch; display: flex; align-items: center; justify-content: center; min-width: 0; padding: 14px 18px 8px 0; }
-.hero-artwork img { display: block; filter: drop-shadow(0 12px 12px rgba(28, 59, 50, .1)); height: auto; max-height: 370px; object-fit: contain; width: 100%; }
+.hero-artwork img { border-radius: 16px; box-shadow: 0 12px 24px rgba(28, 59, 50, .1); display: block; height: auto; max-height: 370px; max-width: 100%; object-fit: contain; width: auto; }
 .study-overview { margin: 42px 0 30px; }
 .study-heading { margin: 0 auto 20px; max-width: 680px; text-align: center; }
 .study-heading h2 { color: #183f33; font-size: clamp(22px, 3vw, 30px); line-height: 1.2; margin: 8px 0; }
 .study-heading > p:last-child { font-size: 14px; line-height: 1.6; margin: 0 auto; max-width: 620px; }
 .study-pillars { display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .study-pillar { background: #fff; border: 1px solid #d5e1df; border-radius: 12px; box-shadow: 0 5px 16px rgba(30, 70, 70, .05); min-width: 0; padding: 20px; }
+.pillar-visual { align-items: flex-start; display: flex; justify-content: space-between; }
+.pillar-visual img { display: block; height: 110px; max-width: calc(100% - 44px); object-fit: contain; width: 150px; }
 .pillar-number { align-items: center; background: #e6eee6; border-radius: 50%; color: #1f5a48; display: inline-flex; font-size: 11px; font-weight: 800; height: 32px; justify-content: center; width: 32px; }
 .study-pillar h3 { color: #183f33; font-size: 16px; margin: 14px 0 7px; }
 .study-pillar p { line-height: 1.55; margin: 0; }
